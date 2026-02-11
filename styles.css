@@ -1,0 +1,22 @@
+*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1020;color:#eef}a{color:#8fd}
+header{padding:24px 16px;background:#121a35;border-bottom:1px solid #223}
+header h1{margin:0 0 4px;font-size:24px}
+.subtitle{margin:0;color:#b7c3ff}
+main{max-width:1100px;margin:0 auto;padding:16px;}
+.card{background:#11192f;border:1px solid #223;border-radius:10px;padding:16px;margin:16px 0}
+.card h2{margin-top:0}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+label{display:block;margin:6px 0}
+input,select,button{padding:8px;border-radius:8px;border:1px solid #334;background:#0b1430;color:#eef}
+input[type="number"]{width:120px}
+button{background:#2e6bff;border-color:#2e6bff;cursor:pointer}
+button.secondary{background:#0b1430;border-color:#445}
+button:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+.table{border:1px solid #223;border-radius:8px;overflow:auto}
+.table table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:8px;border-bottom:1px solid #223;text-align:left}
+.table tr:nth-child(even){background:#0d1632}
+.hint{color:#a9b5ff;font-size:0.9em}
+.muted{color:#9ab}
+footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}

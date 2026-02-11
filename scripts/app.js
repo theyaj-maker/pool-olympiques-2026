@@ -1,0 +1,533 @@
+// app.js
+import { State } from './state.js';
+import { CSV } from './csv.js';
+import { Adapters } from './adapters.js';
+
+const qs = (s) => document.querySelector(s);
+
+const state = State.load();
+
+// --- Scoring ---
+function renderScoring(){
+  qs('#pts-goal').value = state.scoring.goal;
+  qs('#pts-assist').value = state.scoring.assist;
+  qs('#pts-win').value = state.scoring.goalie_win;
+  qs('#pts-otl').value = state.scoring.goalie_otl;
+  qs('#pts-so').value = state.scoring.shutout;
+}
+function bindScoring(){
+  qs('#save-scoring').onclick = () => {
+    state.scoring.goal = parseFloat(qs('#pts-goal').value)||0;
+    state.scoring.assist = parseFloat(qs('#pts-assist').value)||0;
+    state.scoring.goalie_win = parseFloat(qs('#pts-win').value)||0;
+    state.scoring.goalie_otl = parseFloat(qs('#pts-otl').value)||0;
+    state.scoring.shutout = parseFloat(qs('#pts-so').value)||0;
+    State.save(state);
+    alert('Paramètres enregistrés');
+    computeAndRender();
+  };
+  qs('#reset-scoring').onclick = () => { State.resetScoring(state); renderScoring(); State.save(state); computeAndRender(); };
+}
+
+// --- Players master ---
+function renderPlayers(filter=''){
+  const cont = qs('#players-list');
+  const players = state.players
+    .filter(p => `${p.name} ${p.team} ${p.position} ${p.box||''}`.toLowerCase().includes(filter.toLowerCase()))
+    .sort((a,b)=> a.name.localeCompare(b.name));
+  cont.innerHTML = '';
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th><th></th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  players.forEach((p)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.name}</td><td>${p.position}</td><td>${p.team||''}</td><td>${p.box||''}</td>`;
+    const td = document.createElement('td');
+    const del = document.createElement('button');
+    del.className = 'secondary';
+    del.textContent = 'Supprimer';
+    del.onclick = ()=>{ state.players.splice(state.players.indexOf(p),1); State.save(state); renderPlayers(filter); refreshPlayersDatalist(); };
+    td.appendChild(del);
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  cont.appendChild(table);
+}
+function refreshPlayersDatalist(){
+  const dl = qs('#players-datalist');
+  dl.innerHTML = state.players.sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.name}">${p.name} (${p.position}-${p.team||''}) [${p.box||'-'}]</option>`).join('');
+}
+function bindPlayers(){
+  qs('#add-player').onclick = ()=>{
+    const name = qs('#player-name').value.trim();
+    const position = qs('#player-position').value;
+    const team = qs('#player-team').value.trim().toUpperCase();
+    if(!name){ alert('Nom requis'); return; }
+    if(state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){ alert('Déjà présent'); return; }
+    state.players.push({name, position, team});
+    State.save(state);
+    qs('#player-name').value=''; qs('#player-team').value='';
+    renderPlayers(qs('#player-search').value);
+    refreshPlayersDatalist();
+  };
+  qs('#player-search').oninput = (e)=> renderPlayers(e.target.value);
+  qs('#import-players-url').onclick = async ()=>{
+    const url = qs('#players-import-url').value.trim(); if(!url) return;
+    const text = await fetch(url).then(r=>r.text());
+    importPlayersFromCSV(text);
+  };
+  qs('#import-players-file').onclick = ()=> qs('#players-file').click();
+  qs('#players-file').onchange = async (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    importPlayersFromCSV(await file.text());
+  };
+  qs('#export-players').onclick = ()=>{
+    const header = 'name,position,team,box\n';
+    const body = state.players.map(p=>`${CSV.escape(p.name)},${p.position},${p.team||''},${p.box||''}`).join('\n');
+    const blob = new Blob([header+body], {type:'text/csv;charset=utf-8;'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'players.csv'; a.click();
+  };
+}
+function importPlayersFromCSV(text){
+  const rows = CSV.parse(text);
+  if(!rows.length) return;
+  const header = rows.shift().map(h=>h.toLowerCase());
+  const idx = { name: header.indexOf('name'), position: header.indexOf('position'), team: header.indexOf('team'), box: header.indexOf('box') };
+  rows.forEach(r=>{
+    const name = r[idx.name]; if(!name) return;
+    if(!state.players.find(p=>p.name.toLowerCase()===name.toLowerCase())){
+      state.players.push({name, position: r[idx.position]||'F', team: (r[idx.team]||'').toUpperCase(), box: idx.box>=0 ? (r[idx.box]||'') : ''});
+    }
+  });
+  State.save(state); renderPlayers(); refreshPlayersDatalist();
+}
+
+// --- Poolers & draft ---
+function renderPoolers(){
+  const cont = qs('#poolers-list');
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>Pooler</th><th>Skaters</th><th>Gardiens</th><th>Roster</th><th></th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  state.poolers.forEach(pl=>{
+    const rosterCounts = countRoster(pl);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${pl.name}</td><td>${rosterCounts.sk}/${pl.roster.skaters}</td><td>${rosterCounts.go}/${pl.roster.goalies}</td>`;
+    const tdRoster = document.createElement('td');
+    tdRoster.textContent = (pl.players||[]).join(', ');
+    const tdActions = document.createElement('td');
+    const del = document.createElement('button'); del.className='secondary'; del.textContent='Supprimer'; del.onclick = ()=>{ state.poolers = state.poolers.filter(x=>x!==pl); State.save(state); renderPoolers(); refreshDraftPooler(); computeAndRender(); };
+    tdActions.appendChild(del);
+    tr.appendChild(tdRoster); tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
+}
+function bindPoolers(){
+  qs('#add-pooler').onclick = ()=>{
+    const name = qs('#pooler-name').value.trim(); if(!name) return alert('Nom requis');
+    const sk = parseInt(qs('#roster-skaters').value)||0; const go = parseInt(qs('#roster-goalies').value)||0;
+    if(state.poolers.find(p=>p.name.toLowerCase()===name.toLowerCase())) return alert('Pooler déjà existant');
+    state.poolers.push({name, roster:{skaters: sk, goalies: go}, players: []});
+    State.save(state); qs('#pooler-name').value=''; renderPoolers(); refreshDraftPooler(); computeAndRender();
+  };
+}
+function refreshDraftPooler(){
+  const sel = qs('#draft-pooler'); sel.innerHTML = state.poolers.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+}
+function countRoster(pl){
+  const picked = (pl.players||[]).map(n=>state.players.find(p=>p.name===n)).filter(Boolean);
+  return {
+    sk: picked.filter(p=>p.position!=='G').length,
+    go: picked.filter(p=>p.position==='G').length,
+  };
+}
+const BOX_RULES = { B1:1,B2:1,B3:1,B4:1,B5:1,B6:1,B7:1,B8:1,B9:1,B10:1, G1:1, G2:1, BONUS:5 };
+function getBoxCounts(pl){
+  const counts = {};
+  (pl.players||[]).forEach(n=>{ const p = state.players.find(x=>x.name===n); if(!p||!p.box) return; counts[p.box] = (counts[p.box]||0)+1; });
+  return counts;
+}
+function bindDraft(){
+  qs('#draft-add').onclick = ()=>{
+    const poolerName = qs('#draft-pooler').value; if(!poolerName) return alert('Sélectionnez un pooler');
+    const playerName = qs('#draft-player').value.trim(); if(!playerName) return alert('Choisissez un joueur');
+    const player = state.players.find(p=>p.name.toLowerCase()===playerName.toLowerCase()); if(!player) return alert('Joueur introuvable dans la liste maîtresse');
+    const pl = state.poolers.find(p=>p.name===poolerName);
+    pl.players = pl.players || [];
+    if(pl.players.includes(player.name)) return alert('Déjà au roster');
+    const counts = countRoster(pl);
+    if(player.position==='G' && counts.go >= pl.roster.goalies) return alert('Limite de gardiens atteinte');
+    if(player.position!=='G' && counts.sk >= pl.roster.skaters) return alert('Limite de skaters atteinte');
+    if(state.boxRulesEnabled && player.box){
+      const boxCounts = getBoxCounts(pl);
+      const limit = BOX_RULES[player.box] || Infinity;
+      const cur = boxCounts[player.box]||0;
+      if(cur >= limit){ return alert(`Limite atteinte pour la boîte ${player.box}`); }
+    }
+    pl.players.push(player.name);
+    State.save(state);
+    qs('#draft-player').value='';
+    renderPoolers(); renderRosterView(); computeAndRender();
+  };
+}
+function renderRosterView(){
+  const cont = qs('#roster-view');
+  const poolerName = qs('#draft-pooler').value; const pl = state.poolers.find(p=>p.name===poolerName);
+  if(!pl){ cont.innerHTML=''; return; }
+  const picked = (pl.players||[]).map(n=>state.players.find(p=>p.name===n)).filter(Boolean);
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th><th></th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  picked.sort((a,b)=> (a.box||'').localeCompare(b.box||'') || a.position.localeCompare(b.position) || a.name.localeCompare(b.name)).forEach(p=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${p.name}</td><td>${p.position}</td><td>${p.team||''}</td><td>${p.box||''}</td>`;
+    const td = document.createElement('td');
+    const rm = document.createElement('button'); rm.className='secondary'; rm.textContent='Retirer'; rm.onclick=()=>{ pl.players = pl.players.filter(n=>n!==p.name); State.save(state); renderPoolers(); renderRosterView(); computeAndRender(); };
+    td.appendChild(rm); tr.appendChild(td); tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
+}
+
+// --- Stats ingest ---
+let autoTimer = null;
+async function ingestStatsFromCSVText(text){
+  const rows = CSV.parse(text);
+  if(!rows.length) return;
+  const header = rows.shift().map(h=>h.toLowerCase());
+  const idx = { date: header.indexOf('date'), player: header.indexOf('player'), goals: header.indexOf('goals'), assists: header.indexOf('assists'), win: header.indexOf('goalie_win'), otl: header.indexOf('goalie_otl'), so: header.indexOf('shutout') };
+  rows.forEach(r=>{
+    const player = (r[idx.player]||'').trim(); if(!player) return;
+    const key = (r[idx.date]||'').slice(0,10);
+    const goals = parseFloat(r[idx.goals]||0)||0; const assists = parseFloat(r[idx.assists]||0)||0; const win = parseInt(r[idx.win]||0)||0; const otl = parseInt(idx.otl>=0 ? (r[idx.otl]||0) : 0)||0; const so = parseInt(r[idx.so]||0)||0;
+    state.stats[player] = state.stats[player] || {};
+    state.stats[player][key] = {goals, assists, win, otl, so};
+  });
+  state.lastUpdate = new Date().toISOString();
+  State.save(state);
+  computeAndRender();
+  qs('#last-update').textContent = `Dernière mise à jour: ${new Date(state.lastUpdate).toLocaleString()}`;
+}
+function bindStats(){
+  qs('#fetch-stats').onclick = async ()=>{
+    const url = qs('#stats-url').value.trim(); if(!url) return alert('Entrez une URL');
+    const text = await fetch(url, {cache:'no-store'}).then(r=>r.text());
+    ingestStatsFromCSVText(text);
+  };
+  qs('#stats-file').onchange = async (e)=>{
+    const file = e.target.files[0]; if(!file) return; const text = await file.text(); ingestStatsFromCSVText(text);
+  };
+  qs('#import-stats-file').onclick = ()=> qs('#stats-file').click();
+  qs('#auto-refresh').onchange = (e)=>{
+    if(e.target.checked){
+      autoTimer = setInterval(()=> qs('#fetch-stats').click(), 5*60*1000);
+    } else { if(autoTimer) clearInterval(autoTimer); }
+  };
+}
+
+// --- Compute leaderboard ---
+function computeScores(){
+  const s = state.scoring;
+  const totals = [];
+  state.poolers.forEach(pl=>{
+    let sum = 0;
+    (pl.players||[]).forEach(name=>{
+      const days = state.stats[name] || {};
+      Object.values(days).forEach(vals=>{
+        const pts = (vals.goals||0)*s.goal + (vals.assists||0)*s.assist + (vals.win||0)*s.goalie_win + (vals.otl||0)*s.goalie_otl + (vals.so||0)*s.shutout;
+        sum += pts;
+      });
+    });
+    totals.push({pooler: pl.name, points: sum});
+  });
+  totals.sort((a,b)=> b.points - a.points || a.pooler.localeCompare(b.pooler));
+  return {totals};
+}
+function renderLeaderboard(res){
+  const cont = qs('#leaderboard');
+  const table = document.createElement('table');
+  table.innerHTML = '<thead><tr><th>#</th><th>Pooler</th><th>Points</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  res.totals.forEach((row, i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${row.pooler}</td><td>${row.points.toFixed(1)}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
+}
+function bindLeagueIO(){
+  qs('#export-league').onclick = ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pool-olympiques-2026.json'; a.click();
+  };
+  qs('#import-league').onclick = ()=> qs('#import-league-file').click();
+  qs('#import-league-file').onchange = async (e)=>{
+    const file = e.target.files[0]; if(!file) return; const text = await file.text(); const data = JSON.parse(text);
+    State.save(data); location.reload();
+  };
+}
+
+function computeAndRender(){
+  const res = computeScores();
+  renderLeaderboard(res);
+}
+
+function init(){
+  renderScoring(); bindScoring();
+  renderPlayers(); bindPlayers(); refreshPlayersDatalist();
+  renderPoolers(); bindPoolers(); refreshDraftPooler(); bindDraft();
+  // box mode init
+  const cb = document.querySelector('#box-mode'); if(cb){ cb.checked = !!state.boxRulesEnabled; cb.onchange = (e)=>{ state.boxRulesEnabled = e.target.checked; State.save(state); }; }
+  bindStats(); bindLeagueIO();
+  computeAndRender();
+   bindPlayerStatsUI();
+  document.querySelector('#draft-pooler').addEventListener('change', renderRosterView);
+}
+
+window.addEventListener('DOMContentLoaded', init);
+
+/***** =========================
+ *  STATS DES JOUEURS (UI)
+ *========================== ***/
+
+/** Agrège les stats par joueur (avec filtre date inclusif). */
+function aggregatePlayerStats(fromStr, toStr){
+  // bornes temporelles
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+
+  // init accumulateur
+  const acc = new Map(); // name -> {g,a,win,otl,so,points}
+
+  const s = state.scoring;
+  const addTo = (name, g=0,a=0,win=0,otl=0,so=0)=>{
+    if(!acc.has(name)) acc.set(name,{g:0,a:0,win:0,otl:0,so:0,points:0});
+    const o = acc.get(name);
+    o.g += g; o.a += a; o.win += win; o.otl += otl; o.so += so;
+    o.points += g*s.goal + a*s.assist + win*s.goalie_win + otl*s.goalie_otl + so*s.shutout;
+  };
+
+  // parcourir state.stats[player][date] = {goals, assists, win, otl, so}
+  Object.entries(state.stats || {}).forEach(([name, days])=>{
+    Object.entries(days || {}).forEach(([dateStr, v])=>{
+      const d = new Date(dateStr + 'T12:00:00'); // éviter décalages TZ
+      if(from && d < from) return;
+      if(to && d > to) return;
+      addTo(name, v.goals||0, v.assists||0, v.win||0, v.otl||0, v.so||0);
+    });
+  });
+
+  // transforme en tableau et enrichit avec position/team si connu
+  const rows = Array.from(acc.entries()).map(([name,vals])=>{
+    const meta = state.players.find(p=>p.name === name) || {};
+    return {
+      name,
+      position: meta.position || '',
+      team: meta.team || '',
+      box: meta.box || '',
+      goals: vals.g,
+      assists: vals.a,
+      win: vals.win,
+      otl: vals.otl,
+      so: vals.so,
+      points: vals.points
+    };
+  });
+
+  // trier par points desc puis nom
+  rows.sort((a,b)=> b.points - a.points || a.name.localeCompare(b.name));
+  return rows;
+}
+
+/** Construit la table HTML principale (stats agrégées par joueur). */
+function renderPlayerStatsTable(rows, searchText=''){
+  const cont = document.getElementById('player-stats-table');
+  cont.innerHTML = '';
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Joueur</th>
+        <th>Pos</th>
+        <th>Équipe</th>
+        <th>Boîte</th>
+        <th>Buts</th>
+        <th>Passes</th>
+        <th>Win</th>
+        <th>OTL</th>
+        <th>SO</th>
+        <th>Points</th>
+        <th>Détails</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement('tbody');
+
+  const q = (searchText||'').trim().toLowerCase();
+  rows
+    .filter(r => !q || r.name.toLowerCase().includes(q))
+    .forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.name}</td>
+        <td>${r.position}</td>
+        <td>${r.team}</td>
+        <td>${r.box||''}</td>
+        <td>${r.goals}</td>
+        <td>${r.assists}</td>
+        <td>${r.win}</td>
+        <td>${r.otl}</td>
+        <td>${r.so}</td>
+        <td><strong>${r.points.toFixed(1)}</strong></td>
+        <td><button class="secondary" data-player="${r.name}">Voir</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+  table.appendChild(tbody);
+  cont.appendChild(table);
+
+  // bind boutons "Voir" -> ouvre la modale fiche joueur
+  cont.querySelectorAll('button[data-player]').forEach(btn=>{
+    btn.onclick = ()=> openPlayerModal(btn.getAttribute('data-player'));
+  });
+}
+
+/** Ouvre la modale et affiche les stats journalières d’un joueur. */
+function openPlayerModal(playerName){
+  const dlg = document.getElementById('player-modal');
+  document.getElementById('modal-title').textContent = `Fiche – ${playerName}`;
+
+  // préremplir bornes avec min/max des dates existantes
+  const allDates = Object.keys(state.stats[playerName]||{});
+  const minD = allDates.length ? allDates.slice().sort()[0] : '';
+  const maxD = allDates.length ? allDates.slice().sort().slice(-1)[0] : '';
+  document.getElementById('modal-from').value = minD || '';
+  document.getElementById('modal-to').value = maxD || '';
+
+  // dessine le tableau initial
+  renderPlayerDailyTable(playerName, minD, maxD);
+
+  // handlers
+  document.getElementById('modal-apply').onclick = ()=>{
+    const f = document.getElementById('modal-from').value;
+    const t = document.getElementById('modal-to').value;
+    renderPlayerDailyTable(playerName, f, t);
+  };
+  document.getElementById('modal-close').onclick = ()=> dlg.close();
+
+  dlg.showModal();
+}
+
+/** Tableau journalier pour la modale (avec total au bas). */
+function renderPlayerDailyTable(playerName, fromStr, toStr){
+  const cont = document.getElementById('player-daily-table');
+  cont.innerHTML = '';
+
+  const s = state.scoring;
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+
+  const data = Object.entries(state.stats[playerName]||{})
+    .filter(([d])=>{
+      const dt = new Date(d + 'T12:00:00');
+      if(from && dt < from) return false;
+      if(to && dt > to) return false;
+      return true;
+    })
+    .sort(([a],[b])=> a.localeCompare(b))
+    .map(([d,v])=>{
+      const points = (v.goals||0)*s.goal + (v.assists||0)*s.assist +
+                     (v.win||0)*s.goalie_win + (v.otl||0)*s.goalie_otl +
+                     (v.so||0)*s.shutout;
+      return {date:d, ...v, points};
+    });
+
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Date</th><th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th>
+      </tr>
+    </thead>
+  `;
+  const tbody = document.createElement('tbody');
+
+  let sum = {g:0,a:0,win:0,otl:0,so:0,pts:0};
+
+  data.forEach(r=>{
+    sum.g+=r.goals||0; sum.a+=r.assists||0; sum.win+=r.win||0; sum.otl+=r.otl||0; sum.so+=r.so||0; sum.pts+=r.points||0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.date}</td>
+      <td>${r.goals||0}</td>
+      <td>${r.assists||0}</td>
+      <td>${r.win||0}</td>
+      <td>${r.otl||0}</td>
+      <td>${r.so||0}</td>
+      <td><strong>${r.points.toFixed(1)}</strong></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // ligne total
+  const trSum = document.createElement('tr');
+  trSum.innerHTML = `
+    <td><strong>Total</strong></td>
+    <td><strong>${sum.g}</strong></td>
+    <td><strong>${sum.a}</strong></td>
+    <td><strong>${sum.win}</strong></td>
+    <td><strong>${sum.otl}</strong></td>
+    <td><strong>${sum.so}</strong></td>
+    <td><strong>${sum.pts.toFixed(1)}</strong></td>
+  `;
+  tbody.appendChild(trSum);
+
+  table.appendChild(tbody);
+  cont.appendChild(table);
+}
+
+/** Export CSV des stats agrégées affichées. */
+function exportAggregatedCSV(rows){
+  const header = 'name,position,team,box,goals,assists,win,otl,so,points\n';
+  const body = rows.map(r =>
+    `${CSV.escape(r.name)},${r.position},${r.team},${r.box},${r.goals},${r.assists},${r.win},${r.otl},${r.so},${r.points}`
+  ).join('\n');
+  const blob = new Blob([header+body], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'player_stats_aggregated.csv';
+  a.click();
+}
+
+/** Bind de la section Stats des joueurs. */
+function bindPlayerStatsUI(){
+  const search = document.getElementById('player-stats-search');
+  const fromEl = document.getElementById('stats-from');
+  const toEl   = document.getElementById('stats-to');
+  const btnRef = document.getElementById('stats-refresh');
+  const btnExp = document.getElementById('stats-export');
+
+  // bornes par défaut : toutes dates présentes
+  const allDates = new Set();
+  Object.values(state.stats||{}).forEach(days=>{
+    Object.keys(days||{}).forEach(d=> allDates.add(d));
+  });
+  const sortDates = Array.from(allDates).sort();
+  if(sortDates.length){
+    fromEl.value = sortDates[0];
+    toEl.value = sortDates[sortDates.length-1];
+  }
+
+  let currentRows = aggregatePlayerStats(fromEl.value, toEl.value);
+  renderPlayerStatsTable(currentRows, search.value);
+
+  const refresh = ()=>{
+    currentRows = aggregatePlayerStats(fromEl.value, toEl.value);
+    renderPlayerStatsTable(currentRows, search.value);
+  };
+
+  btnRef.onclick = refresh;
+  search.oninput = ()=> renderPlayerStatsTable(currentRows, search.value);
+  btnExp.onclick = ()=> exportAggregatedCSV(currentRows);
+}

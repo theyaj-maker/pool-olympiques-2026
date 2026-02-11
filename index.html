@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pool Hockey Olympiques 2026</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Pool de hockey – Olympiques 2026</h1>
+    <p class="subtitle">Gestion des poolers, repêchage, calcul des points en direct (ou fin de journée)</p>
+  </header>
+
+  <main>
+    <section class="card" id="scoring-section">
+      <h2>Paramètres de pointage</h2>
+      <div class="grid-2">
+        <label>Points par but <input id="pts-goal" type="number" value="1" min="0" step="0.5"></label>
+        <label>Points par passe <input id="pts-assist" type="number" value="1" min="0" step="0.5"></label>
+        <label>Victoire gardien <input id="pts-win" type="number" value="2" min="0" step="0.5"></label>
+        <label>Défaite gardien (OT/TB) <input id="pts-otl" type="number" value="1" min="0" step="0.5"></label>
+        <label>Blanchissage <input id="pts-so" type="number" value="3" min="0" step="0.5"></label>
+      </div>
+      <div class="actions">
+        <button id="save-scoring">Sauvegarder</button>
+        <button id="reset-scoring" class="secondary">Réinitialiser</button>
+      </div>
+      <p class="hint">Ces paramètres s'appliquent au calcul des points de tous les poolers.</p>
+    </section>
+
+    <section class="card" id="players-section">
+      <h2>Joueurs (liste maîtresse)</h2>
+      <div class="grid-2">
+        <div>
+          <div class="actions">
+            <input id="player-name" placeholder="Nom du joueur" />
+            <select id="player-position">
+              <option value="F">Attaquant (F)</option>
+              <option value="D">Défenseur (D)</option>
+              <option value="G">Gardien (G)</option>
+            </select>
+            <input id="player-team" placeholder="Équipe (p. ex. CAN)" />
+            <button id="add-player">Ajouter</button>
+          </div>
+          <div class="actions">
+            <input id="players-import-url" placeholder="URL CSV Google Sheets (publié)" />
+            <button id="import-players-url" class="secondary">Importer via URL</button>
+            <input type="file" id="players-file" accept=".csv" />
+            <button id="import-players-file" class="secondary">Importer via fichier CSV</button>
+          </div>
+        </div>
+        <div>
+          <label>Recherche <input id="player-search" placeholder="Rechercher un joueur"></label>
+          <div id="players-list" class="table"></div>
+          <div class="actions">
+            <button id="export-players" class="secondary">Exporter (CSV)</button>
+          </div>
+        </div>
+      </div>
+      <details class="hint"><summary>Format CSV attendu</summary>
+        <pre>name,position,team,box
+Connor McDavid,F,CAN,B3
+Cale Makar,D,CAN,B2
+Jordan Binnington,G,CAN,G1
+...</pre>
+      </details>
+    </section>
+
+    <section class="card" id="poolers-section">
+      <h2>Poolers & repêchage</h2>
+      <div class="grid-2">
+        <div>
+          <div class="actions">
+            <input id="pooler-name" placeholder="Nom du pooler" />
+            <label>Taille d'alignement: Skaters <input id="roster-skaters" type="number" value="15" min="0"></label>
+            <label>Gardiens <input id="roster-goalies" type="number" value="2" min="0"></label>
+            <button id="add-pooler">Ajouter pooler</button>
+          </div>
+          <div id="poolers-list" class="table"></div>
+        </div>
+        <div>
+          <h3>Repêchage / Sélection</h3>
+          <label><input type="checkbox" id="box-mode"> Activer les règles de boîtes (B1..B10=1, G1=1, G2=1, BONUS=5)</label>
+          <label>Pooler
+            <select id="draft-pooler"></select>
+          </label>
+          <label>Joueur
+            <input id="draft-player" placeholder="Saisir nom puis choisir" list="players-datalist" />
+            <datalist id="players-datalist"></datalist>
+          </label>
+          <button id="draft-add">Ajouter au roster</button>
+          <div id="roster-view" class="table"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="data-section">
+      <h2>Mise à jour des statistiques</h2>
+      <p>Choisissez votre source pour mettre à jour les points (quotidien ou quasi direct).</p>
+      <div class="grid-2">
+        <div>
+          <h3>1) Google Sheets (recommandé – gratuit)</h3>
+          <p>Publiez une feuille au format CSV et collez l'URL ci-dessous.</p>
+          <input id="stats-url" placeholder="URL CSV des stats (publié)" />
+          <div class="actions">
+            <button id="fetch-stats">Mettre à jour maintenant</button>
+            <label><input type="checkbox" id="auto-refresh"> Rafraîchir automatiquement (5 min)</label>
+          </div>
+          <details class="hint"><summary>Format CSV attendu</summary>
+            <pre>date,player,goals,assists,goalie_win,goalie_otl,shutout
+2026-02-11,Juraj Slafkovsky,1,1,0,0,0
+2026-02-11,Samuel Hlavaj,0,0,1,0,0
+...</pre>
+          </details>
+        </div>
+        <div>
+          <h3>2) Import manuel</h3>
+          <input type="file" id="stats-file" accept=".csv" />
+          <button id="import-stats-file">Importer stats (CSV)</button>
+          <h3>3) API tierce (optionnel)</h3>
+          <p>Brancher un adaptateur (RapidAPI, TheSportsDB, etc.). Voir <code>adapters.js</code>.</p>
+        </div>
+      </div>
+      <div id="last-update" class="muted"></div>
+    </section>
+
+    <section class="card" id="leaderboard-section">
+      <h2>Classement</h2>
+      <div class="actions">
+        <button id="recompute">Recalculer maintenant</button>
+        <button id="export-league" class="secondary">Exporter la ligue (JSON)</button>
+        <input type="file" id="import-league-file" accept="application/json" />
+        <button id="import-league" class="secondary">Importer la ligue</button>
+      </div>
+      <div id="leaderboard" class="table"></div>
+    </section>
+	<!-- === Statistiques des joueurs === -->
+<section class="card" id="player-stats-section">
+  <h2>Statistiques des joueurs</h2>
+
+  <div class="actions">
+    <label>Recherche
+      <input id="player-stats-search" placeholder="Nom du joueur (ex: Slafkovsky)">
+    </label>
+    <label>Du
+      <input id="stats-from" type="date">
+    </label>
+    <label>Au
+      <input id="stats-to" type="date">
+    </label>
+    <button id="stats-refresh">Appliquer</button>
+    <button id="stats-export" class="secondary">Exporter (CSV)</button>
+  </div>
+
+  <div id="player-stats-table" class="table"></div>
+
+  <!-- Modal fiche joueur -->
+  <dialog id="player-modal">
+    <h3 id="modal-title">Fiche joueur</h3>
+    <div class="actions">
+      <label>Du <input id="modal-from" type="date"></label>
+      <label>Au <input id="modal-to" type="date"></label>
+      <button id="modal-apply">Filtrer</button>
+      <button id="modal-close" class="secondary">Fermer</button>
+    </div>
+    <div id="player-daily-table" class="table"></div>
+  </dialog>
+</section>
+    <section class="card" id="about-section">
+      <h2>À propos</h2>
+      <ul>
+        <li>Appli statique (HTML/JS) – hébergeable sur GitHub Pages.</li>
+        <li>Données persistées dans <code>localStorage</code> + export/import JSON.</li>
+        <li>Source de données extensible via <code>adapters.js</code>.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2026 Pool Hockey Olympiques (usage personnel, gratuit). Construit pour un déploiement simple.</p>
+  </footer>
+
+  <script type="module" src="scripts/app.js"></script>
+</body>
+</html>
