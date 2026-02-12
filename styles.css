@@ -67,3 +67,9 @@ footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}
 .hide-legacy-draft #draft-add{
   display:none !important;
 }
+
+.link-btn {
+  background: none; border: none; color: #7fc5ff;
+  text-decoration: underline; cursor: pointer; padding: 0;
+}
+.link-btn:hover { color: #bfe3ff; }
