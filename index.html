@@ -160,6 +160,24 @@ Jordan Binnington,G,CAN,G1
         </div>
       </div>
       <div id="last-update" class="muted"></div>
+		<!-- Sources distantes (CSV publiés Google Sheets) -->
+<div class="card" style="margin-top:8px;">
+  <h3>Sources distantes (CSV publiés)</h3>
+  <p>Colle les URLs CSV publiées (Google Sheets → Fichier → Partager → Publier sur le Web → CSV → Onglet).</p>
+  <div class="grid-2">
+    <label>URL CSV des <strong>Poolers</strong> (Poolers!A:C)
+      <input id="poolers-url" placeholder="https://docs.google.com/.../pub?gid=...&single=true&output=csv" />
+    </label>
+    <label>URL CSV des <strong>Rosters</strong> (optionnel, Rosters!A:B ou A:E)
+      <input id="rosters-url" placeholder="https://docs.google.com/.../pub?gid=...&single=true&output=csv" />
+    </label>
+  </div>
+  <div class="actions">
+    <button id="save-remote-sources">Sauvegarder les URLs</button>
+    <button id="refresh-remote" class="secondary">Rafraîchir maintenant</button>
+  </div>
+  <p class="muted">Format attendu : Poolers = <code>pooler,skaters,goalies</code>. Rosters = <code>pooler,player[,position,team,box]</code>.</p>
+</div>
     </section>
 
     <section class="card" id="leaderboard-section">
