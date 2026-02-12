@@ -106,6 +106,17 @@ Jordan Binnington,G,CAN,G1
           <label>Pooler
             <select id="draft-pooler"></select>
           </label>
+			<!-- Sélection par boîtes -->
+<div id="box-draft" class="box-draft">
+  <p class="hint">Sélectionne 1 joueur par boîte (BONUS = 5 joueurs), puis clique « Ajouter la sélection ».</p>
+  <div id="box-draft-grid" class="box-draft-grid">
+    <!-- Les <select> par boîte sont générés dynamiquement par app.js -->
+  </div>
+  <div class="actions">
+    <button id="box-draft-apply">Ajouter la sélection</button>
+    <button id="box-draft-clear" class="secondary">Effacer</button>
+  </div>
+</div>
           <label>Joueur
             <input id="draft-player" placeholder="Saisir nom puis choisir" list="players-datalist" />
             <datalist id="players-datalist"></datalist>
