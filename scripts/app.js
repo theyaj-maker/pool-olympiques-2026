@@ -1,3 +1,24 @@
+// =====================================================
+// 1) IMPORTS (toujours au tout début du module)
+// =====================================================
+import { State } from './state.js';
+import { CSV }   from './csv.js';
+import { Adapters } from './adapters.js';
+
+// Petit utilitaire DOM facultatif (si tu veux)
+const qs = (sel) => document.querySelector(sel);
+
+// =====================================================
+// 2) INITIALISATION CENTRALE DU STATE (une seule fois)
+//    -> accessible partout via "state" et via window.state
+// =====================================================
+const __existing = window.__POOL_STATE__;
+export const state = __existing || State.load();
+if (!__existing) {
+  window.__POOL_STATE__ = state;
+  window.state = state; // pratique pour le debug dans la console
+}
+
 /*** =========================================================
  * ACCÈS PAR JETON SIGNÉ — ZÉRO SECRET DANS LE REPO
  * ECDSA P‑256 (clé privée conservée par toi), SHA‑256
@@ -5,34 +26,32 @@
  * Payload conseillé : { role:"viewer"|"manager", exp:"ISO", aud:"https://<user>.github.io/<repo>", sub?:... }
  *========================================================= ***/
 
-// 1) <<< Colle ici ta CLÉ PUBLIQUE JWK (non secrète) générée au §4 >>>
+// 3) CLÉ PUBLIQUE JWK (non secrète) — COLLER ICI LA TIENNE
 const PUBLIC_JWK = {
-"crv": "P-256",
+  "crv": "P-256",
   "ext": true,
-  "key_ops": [
-    "verify"
-  ],
+  "key_ops": ["verify"],
   "kty": "EC",
   "x": "yhuI022ZqJOwpoB1o8NvywoDWBNEqRaIP7gwdCi8j6M",
   "y": "34j5Ghey2nwlSnhIi23nXhY8jcnDdgwu5OJ9k592w-0"
 };
 
-// 2) Helpers base64url
+// 4) Helpers base64url
 const b64urlToBytes = (s) => {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
   const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
   s += '='.repeat(pad);
   const bin = atob(s);
   const bytes = new Uint8Array(bin.length);
-  for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
 };
 const bytesToB64url = (buf) => {
   const b = Array.from(new Uint8Array(buf)).map(ch => String.fromCharCode(ch)).join('');
-  return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  return btoa(b).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
-// 3) Import clé publique WebCrypto (ECDSA P‑256)
+// 5) Import clé publique WebCrypto (ECDSA P‑256)
 async function importPublicKey(jwk) {
   return crypto.subtle.importKey(
     'jwk', jwk,
@@ -41,7 +60,7 @@ async function importPublicKey(jwk) {
   );
 }
 
-// 4) Vérifie un token (signature + exp/nbf/aud + rôle)
+// 6) Vérifier un token (signature + exp/nbf/aud + rôle)
 async function verifyToken(token) {
   try {
     if (!token) return { ok:false, msg:'Token manquant' };
@@ -50,7 +69,7 @@ async function verifyToken(token) {
     if (dot <= 0) return { ok:false, msg:'Format token invalide' };
 
     const pB64 = token.slice(0, dot);
-    const sB64 = token.slice(dot+1);
+    const sB64 = token.slice(dot + 1);
 
     const payloadJSON = new TextDecoder().decode(b64urlToBytes(pB64));
     const payload = JSON.parse(payloadJSON);
@@ -60,16 +79,18 @@ async function verifyToken(token) {
     if (payload.nbf && now < new Date(payload.nbf)) return { ok:false, msg:'Token non actif (nbf)' };
     if (payload.exp && now > new Date(payload.exp)) return { ok:false, msg:'Token expiré' };
     if (payload.aud) {
-  const expectedOrigin = location.origin; // ex: https://theyaj-maker.github.io
-  const repoBase = location.pathname.split('/').slice(0,2).join('/'); // ex: /pool-olympiques-2026
-  const expectedWithRepo = expectedOrigin + repoBase;                 // ex: https://theyaj-maker.github.io/pool-olympiques-2026
-  if (payload.aud !== expectedOrigin && payload.aud !== expectedWithRepo) {
-    return { ok:false, msg:'Audience invalide' };
-  }
-}
+      const expectedOrigin  = location.origin;                                  // ex: https://theyaj-maker.github.io
+      const repoBase        = location.pathname.split('/').slice(0,2).join('/'); // ex: /pool-olympiques-2026
+      const expectedWithRepo= expectedOrigin + repoBase;                         // ex: https://theyaj-maker.github.io/pool-olympiques-2026
+      if (payload.aud !== expectedOrigin && payload.aud !== expectedWithRepo) {
+        return { ok:false, msg:'Audience invalide' };
+      }
+    }
 
     // rôle
-    if (payload.role !== 'viewer' && payload.role !== 'manager') return { ok:false, msg:'Rôle invalide' };
+    if (payload.role !== 'viewer' && payload.role !== 'manager') {
+      return { ok:false, msg:'Rôle invalide' };
+    }
 
     // signature
     const pubKey = await importPublicKey(PUBLIC_JWK);
@@ -88,7 +109,7 @@ async function verifyToken(token) {
   }
 }
 
-// 5) Stockage local (non sensible) du statut d’accès
+// 7) Stockage local (non sensible) du statut d’accès
 function setAuth(role, payload, token) {
   localStorage.setItem('pool-auth', JSON.stringify({ role, payload, token }));
 }
@@ -100,26 +121,29 @@ function clearAuth() {
   localStorage.removeItem('pool-auth');
 }
 
-// 6) Applique l’accès (affiche/masque portail et blocs admin)
+// 8) Appliquer l’accès (affiche/masque portail et blocs admin)
 function applyAccessControls() {
   const auth = getAuth();
-  const app = document.getElementById('app-root');
+  const app  = document.getElementById('app-root');
   const gate = document.getElementById('access-gate');
 
-  if (auth) { gate.hidden = true; app.hidden = false; }
-  else      { gate.hidden = false; app.hidden = true; }
+  if (auth) { gate.hidden = true;  app.hidden = false; }
+  else      { gate.hidden = false; app.hidden = true;  }
 
   document.querySelectorAll('[data-role="manager-only"]').forEach(el => {
     el.style.display = (auth && auth.role === 'manager') ? '' : 'none';
   });
 }
 
-// 7) Essaie ?token=... ou #token=...
+// 9) Essayer ?token=... ou #token=...
 async function tryTokenFromURL() {
-  const url = new URL(location.href);
-  const token = url.searchParams.get('token') ||
+  const url   = new URL(location.href);
+  const raw   = url.searchParams.get('token') ||
                 (location.hash.startsWith('#token=') ? location.hash.slice(7) : null);
-  if (!token) return false;
+  if (!raw) return false;
+
+  // nettoyage léger (au cas où un espace/retour ligne s’est glissé)
+  const token = raw.trim().replace(/\s+/g, '');
 
   const res = await verifyToken(token);
   const msg = document.getElementById('gate-msg');
@@ -134,7 +158,7 @@ async function tryTokenFromURL() {
   }
 }
 
-// 8) Collage manuel dans le portail
+// 10) Collage manuel dans le portail
 function bindGateUI() {
   const btn = document.getElementById('btn-try-token');
   const ta  = document.getElementById('paste-token');
@@ -142,7 +166,7 @@ function bindGateUI() {
 
   if (btn && ta) {
     btn.onclick = async () => {
-      const token = ta.value.trim();
+      const token = (ta.value || '').trim().replace(/\s+/g, '');
       const res = await verifyToken(token);
       if (res.ok) {
         setAuth(res.payload.role, res.payload, token);
@@ -153,24 +177,6 @@ function bindGateUI() {
     };
   }
 }
-
-// app.js
-import { State } from './state.js';
-import { CSV } from './csv.js';
-import { Adapters } from './adapters.js';
-
-
-
-const qs = (s) => document.querySelector(s);
-
-// --- Initialisation centrale du state (une seule fois) ---
-const __existing = window.__POOL_STATE__;
-export const state = __existing || State.load();
-if (!__existing) {
-  window.__POOL_STATE__ = state;   // persiste au niveau global (utile pour console/outils)
-  window.state = state;            // alias pratique pour debug
-}
-
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
  *  - Poolers : pooler,skaters,goalies
