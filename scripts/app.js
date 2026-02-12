@@ -631,7 +631,7 @@ async function bootAuthThenApp() {
   renderPoolers(); bindPoolers(); refreshDraftPooler(); bindDraft();
   
 renderBoxDraftUI();
-bindBoxDraft(
+bindBoxDraft();
 
 
   // (si tu as le checkbox box-mode)
