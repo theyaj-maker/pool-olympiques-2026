@@ -337,6 +337,32 @@ function bindBoxDraft(){
   if(poolerSel) poolerSel.addEventListener('change', renderBoxDraftUI);
 }
 
+function exportPoolersCSV(){
+  const rows = [];
+  rows.push("pooler,player,position,team,box");
+
+  (state.poolers || []).forEach(pl => {
+    (pl.players || []).forEach(name => {
+      const p = state.players.find(x => x.name === name);
+      if(!p) return;
+      rows.push(
+        [
+          CSV.escape(pl.name),
+          CSV.escape(p.name),
+          p.position || "",
+          p.team || "",
+          p.box || ""
+        ].join(",")
+      );
+    });
+  });
+
+  const blob = new Blob([rows.join("\n")], {type: "text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "poolers_export.csv";
+  a.click();
+}
 
 // --- Scoring ---
 function renderScoring(){
@@ -643,6 +669,9 @@ bindBoxDraft();
 
   bindStats(); bindLeagueIO();
   computeAndRender();
+
+  const btnExport = document.getElementById('export-poolers');
+if(btnExport) btnExport.onclick = exportPoolersCSV;
 
   // (si tu as ajouté la section "Statistiques des joueurs")
   if (document.getElementById('player-stats-section')) bindPlayerStatsUI();
