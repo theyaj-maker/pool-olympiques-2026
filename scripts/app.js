@@ -163,6 +163,181 @@ const qs = (s) => document.querySelector(s);
 
 const state = State.load();
 
+/***** =======================================================
+ *  SÉLECTION PAR BOÎTES (B1..B10, G1, G2, BONUS x5)
+ *========================================================= ***/
+
+// Définition des boîtes et des quotas (cohérent avec BOX_RULES existants)
+const BOX_LAYOUT = [
+  { key:'B1',    label:'Boîte B1',   picks:1 },
+  { key:'B2',    label:'Boîte B2',   picks:1 },
+  { key:'B3',    label:'Boîte B3',   picks:1 },
+  { key:'B4',    label:'Boîte B4',   picks:1 },
+  { key:'B5',    label:'Boîte B5',   picks:1 },
+  { key:'B6',    label:'Boîte B6',   picks:1 },
+  { key:'B7',    label:'Boîte B7',   picks:1 },
+  { key:'B8',    label:'Boîte B8',   picks:1 },
+  { key:'B9',    label:'Boîte B9',   picks:1 },
+  { key:'B10',   label:'Boîte B10',  picks:1 },
+  { key:'G1',    label:'Gardiens G1',picks:1 },
+  { key:'G2',    label:'Gardiens G2',picks:1 },
+  { key:'BONUS', label:'BONUS',      picks:5 },
+];
+
+// Retourne la liste des joueurs pour une boîte donnée (triés)
+function getPlayersByBox(boxKey){
+  return state.players
+    .filter(p => (p.box||'').toUpperCase() === boxKey.toUpperCase())
+    .sort((a,b)=> a.name.localeCompare(b.name));
+}
+
+// Construit une <option> lisible
+function optionLabel(p){
+  // Ex: "Connor McDavid — F-CAN  [B3]"
+  return `${p.name} — ${p.position||''}-${p.team||''}  [${p.box||''}]`;
+}
+
+// Rend la grille des <select> par boîtes
+function renderBoxDraftUI(){
+  const grid = document.getElementById('box-draft-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+
+  const poolerSel = document.getElementById('draft-pooler');
+  const poolerName = poolerSel ? poolerSel.value : null;
+  const pooler = state.poolers.find(x=>x.name===poolerName);
+
+  // On va désactiver les joueurs déjà pris par ce pooler
+  const already = new Set((pooler?.players||[]));
+
+  BOX_LAYOUT.forEach(box=>{
+    const card = document.createElement('div');
+    card.className = 'box-card';
+
+    // Titre
+    const h = document.createElement('h4');
+    h.textContent = `${box.label} ${box.picks>1 ? `(${box.picks} choix)` : ''}`;
+    card.appendChild(h);
+
+    // Génère N <select> pour cette boîte
+    for(let i=1; i<=box.picks; i++){
+      const sel = document.createElement('select');
+      sel.id = (box.key==='BONUS' ? `box-${box.key}-${i}` : `box-${box.key}`);
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '— choisir —';
+      sel.appendChild(placeholder);
+
+      // Options = joueurs de cette boîte
+      getPlayersByBox(box.key).forEach(p=>{
+        const opt = document.createElement('option');
+        opt.value = p.name;
+        opt.textContent = optionLabel(p);
+        // Si déjà au roster, on grise
+        if(already.has(p.name)) opt.disabled = true;
+        sel.appendChild(opt);
+      });
+
+      // Marges
+      sel.style.marginBottom = '6px';
+      card.appendChild(sel);
+    }
+
+    grid.appendChild(card);
+  });
+}
+
+// Efface les sélections en cours
+function clearBoxDraftSelections(){
+  const grid = document.getElementById('box-draft-grid');
+  if(!grid) return;
+  grid.querySelectorAll('select').forEach(sel => sel.value = '');
+}
+
+// Ajoute un joueur au roster avec validations (réutilise tes règles)
+function addOneToRoster(pooler, player){
+  // déjà pris ?
+  pooler.players = pooler.players || [];
+  if(pooler.players.includes(player.name)) return { ok:false, msg:`${player.name} est déjà dans le roster` };
+
+  // limites roster
+  const counts = countRoster(pooler);
+  if(player.position==='G' && counts.go >= pooler.roster.goalies){
+    return { ok:false, msg:`Limite de gardiens atteinte (${pooler.roster.goalies})` };
+  }
+  if(player.position!=='G' && counts.sk >= pooler.roster.skaters){
+    return { ok:false, msg:`Limite de skaters atteinte (${pooler.roster.skaters})` };
+  }
+
+  // règles de boîtes
+  if(state.boxRulesEnabled && player.box){
+    const boxCounts = getBoxCounts(pooler);
+    const BOX_RULES = { B1:1,B2:1,B3:1,B4:1,B5:1,B6:1,B7:1,B8:1,B9:1,B10:1, G1:1, G2:1, BONUS:5 };
+    const limit = BOX_RULES[player.box] || Infinity;
+    const cur = boxCounts[player.box] || 0;
+    if(cur >= limit){
+      return { ok:false, msg:`Limite atteinte pour la boîte ${player.box}` };
+    }
+  }
+
+  // OK
+  pooler.players.push(player.name);
+  return { ok:true };
+}
+
+// Collecte toutes les sélections et ajoute au roster
+function applyBoxDraft(){
+  const poolerSel = document.getElementById('draft-pooler');
+  if(!poolerSel || !poolerSel.value) { alert('Sélectionne un pooler.'); return; }
+  const pooler = state.poolers.find(x=>x.name===poolerSel.value);
+  if(!pooler){ alert('Pooler introuvable.'); return; }
+
+  // Récupère tous les selects remplis
+  const grid = document.getElementById('box-draft-grid');
+  const chosenNames = [];
+  grid.querySelectorAll('select').forEach(sel=>{
+    const v = sel.value.trim();
+    if(v) chosenNames.push(v);
+  });
+
+  if(chosenNames.length===0){ alert('Aucun joueur sélectionné.'); return; }
+
+  // Ajoute un par un avec validations
+  const errors = [];
+  chosenNames.forEach(name=>{
+    const p = state.players.find(x=>x.name===name);
+    if(!p){ errors.push(`${name}: introuvable`); return; }
+    const res = addOneToRoster(pooler, p);
+    if(!res.ok) errors.push(`${name}: ${res.msg}`);
+  });
+
+  // Sauvegarde & rafraîchit
+  State.save(state);
+  renderPoolers();
+  renderRosterView();
+  renderBoxDraftUI(); // regénère les menus (désactive ce qui vient d’être pris)
+  computeAndRender();
+
+  if(errors.length){
+    alert(`Certaines sélections n'ont pas pu être ajoutées:\n- ${errors.join('\n- ')}`);
+  }else{
+    alert('Sélection ajoutée.');
+  }
+}
+
+// Bind des boutons
+function bindBoxDraft(){
+  const applyBtn = document.getElementById('box-draft-apply');
+  const clearBtn = document.getElementById('box-draft-clear');
+  if(applyBtn) applyBtn.onclick = applyBoxDraft;
+  if(clearBtn) clearBtn.onclick = clearBoxDraftSelections;
+
+  // Re-rendre la grille quand on change de pooler
+  const poolerSel = document.getElementById('draft-pooler');
+  if(poolerSel) poolerSel.addEventListener('change', renderBoxDraftUI);
+}
+
+
 // --- Scoring ---
 function renderScoring(){
   qs('#pts-goal').value = state.scoring.goal;
@@ -257,6 +432,7 @@ function importPlayersFromCSV(text){
     }
   });
   State.save(state); renderPlayers(); refreshPlayersDatalist();
+  renderBoxDraftUI();
 }
 
 // --- Poolers & draft ---
@@ -453,6 +629,10 @@ async function bootAuthThenApp() {
   renderScoring(); bindScoring();
   renderPlayers(); bindPlayers(); refreshPlayersDatalist();
   renderPoolers(); bindPoolers(); refreshDraftPooler(); bindDraft();
+  
+renderBoxDraftUI();
+bindBoxDraft(
+
 
   // (si tu as le checkbox box-mode)
   const cb = document.querySelector('#box-mode');
