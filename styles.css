@@ -43,3 +43,27 @@ footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}
   color: #9ab;
   margin-top: 8px;
 }
+
+/* Grille de sélection par boîtes */
+.box-draft-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:12px;
+  margin:8px 0 12px;
+}
+.box-card{
+  border:1px solid #223;
+  border-radius:8px;
+  padding:10px;
+  background:#0d1632;
+}
+.box-card h4{
+  margin:0 0 8px;
+  font-size:14px;
+  color:#b7c3ff;
+}
+/* (optionnel) masquer l'ancien champ de saisie libre si tu veux */
+.hide-legacy-draft #draft-player, 
+.hide-legacy-draft #draft-add{
+  display:none !important;
+}
