@@ -32,7 +32,7 @@
 <!-- Ton appli existante -->
   <main id="app-root" hidden>
 
-    <section class="card" id="scoring-section">
+   <section class="card" id="scoring-section" data-role="manager-only">
       <h2>Paramètres de pointage</h2>
       <div class="grid-2">
         <label>Points par but <input id="pts-goal" type="number" value="1" min="0" step="0.5"></label>
@@ -48,7 +48,7 @@
       <p class="hint">Ces paramètres s'appliquent au calcul des points de tous les poolers.</p>
     </section>
 
-    <section class="card" id="players-section">
+    <section class="card" id="players-section" data-role="manager-only">
       <h2>Joueurs (liste maîtresse)</h2>
       <div class="grid-2">
         <div>
@@ -90,15 +90,17 @@ Jordan Binnington,G,CAN,G1
       <h2>Poolers & repêchage</h2>
       <div class="grid-2">
         <div>
+			<div data-role="manager-only">
           <div class="actions">
             <input id="pooler-name" placeholder="Nom du pooler" />
             <label>Taille d'alignement: Skaters <input id="roster-skaters" type="number" value="15" min="0"></label>
             <label>Gardiens <input id="roster-goalies" type="number" value="2" min="0"></label>
             <button id="add-pooler">Ajouter pooler</button>
           </div>
+				 </div>
           <div id="poolers-list" class="table"></div>
         </div>
-        <div>
+        <div data-role="manager-only">
           <h3>Repêchage / Sélection</h3>
           <label><input type="checkbox" id="box-mode"> Activer les règles de boîtes (B1..B10=1, G1=1, G2=1, BONUS=5)</label>
           <label>Pooler
@@ -114,7 +116,7 @@ Jordan Binnington,G,CAN,G1
       </div>
     </section>
 
-    <section class="card" id="data-section">
+    <section class="card" id="data-section" data-role="manager-only">
       <h2>Mise à jour des statistiques</h2>
       <p>Choisissez votre source pour mettre à jour les points (quotidien ou quasi direct).</p>
       <div class="grid-2">
