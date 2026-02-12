@@ -13,8 +13,8 @@ const PUBLIC_JWK = {
     "verify"
   ],
   "kty": "EC",
-  "x": "ZNVWMnVj7KVfhauVd8g2023zTmun00uQx8Pq29A9qPo",
-  "y": "veBV2A87aIcwhw7luQF27SxSJeKshH2t4XraY-SuUCc"
+  "x": "t8DrGQPjmyMurI7wZbdkG0hIuKenVS4BaU2GVsQCApY",
+  "y": "Dp2GtxujxfNxM3RJo_xuXA7u9fzipLPmovXWqkNt1_c"
 };
 
 // 2) Helpers base64url
