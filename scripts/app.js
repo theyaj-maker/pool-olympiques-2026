@@ -1,3 +1,149 @@
+/*** =========================================================
+ * ACCÈS PAR JETON SIGNÉ — ZÉRO SECRET DANS LE REPO
+ * ECDSA P‑256 (clé privée conservée par toi), SHA‑256
+ * Token compact = base64url(JSON payload) + "." + base64url(signature)
+ * Payload conseillé : { role:"viewer"|"manager", exp:"ISO", aud:"https://<user>.github.io/<repo>", sub?:... }
+ *========================================================= ***/
+
+// 1) <<< Colle ici ta CLÉ PUBLIQUE JWK (non secrète) générée au §4 >>>
+const PUBLIC_JWK = {
+  // "kty":"EC",
+  // "crv":"P-256",
+  // "x":"...",
+  // "y":"...",
+  // "ext": true
+};
+
+// 2) Helpers base64url
+const b64urlToBytes = (s) => {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
+  s += '='.repeat(pad);
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+};
+const bytesToB64url = (buf) => {
+  const b = Array.from(new Uint8Array(buf)).map(ch => String.fromCharCode(ch)).join('');
+  return btoa(b).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+};
+
+// 3) Import clé publique WebCrypto (ECDSA P‑256)
+async function importPublicKey(jwk) {
+  return crypto.subtle.importKey(
+    'jwk', jwk,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true, ['verify']
+  );
+}
+
+// 4) Vérifie un token (signature + exp/nbf/aud + rôle)
+async function verifyToken(token) {
+  try {
+    if (!token) return { ok:false, msg:'Token manquant' };
+
+    const dot = token.indexOf('.');
+    if (dot <= 0) return { ok:false, msg:'Format token invalide' };
+
+    const pB64 = token.slice(0, dot);
+    const sB64 = token.slice(dot+1);
+
+    const payloadJSON = new TextDecoder().decode(b64urlToBytes(pB64));
+    const payload = JSON.parse(payloadJSON);
+
+    // dates / audience
+    const now = new Date();
+    if (payload.nbf && now < new Date(payload.nbf)) return { ok:false, msg:'Token non actif (nbf)' };
+    if (payload.exp && now > new Date(payload.exp)) return { ok:false, msg:'Token expiré' };
+    if (payload.aud && payload.aud !== location.origin) return { ok:false, msg:'Audience invalide' };
+
+    // rôle
+    if (payload.role !== 'viewer' && payload.role !== 'manager') return { ok:false, msg:'Rôle invalide' };
+
+    // signature
+    const pubKey = await importPublicKey(PUBLIC_JWK);
+    const ok = await crypto.subtle.verify(
+      { name:'ECDSA', hash:'SHA-256' },
+      pubKey,
+      b64urlToBytes(sB64),
+      new TextEncoder().encode(pB64)
+    );
+    if (!ok) return { ok:false, msg:'Signature invalide' };
+
+    return { ok:true, payload };
+  } catch (e) {
+    console.error('verifyToken error:', e);
+    return { ok:false, msg:'Erreur interne' };
+  }
+}
+
+// 5) Stockage local (non sensible) du statut d’accès
+function setAuth(role, payload, token) {
+  localStorage.setItem('pool-auth', JSON.stringify({ role, payload, token }));
+}
+function getAuth() {
+  try { return JSON.parse(localStorage.getItem('pool-auth')); }
+  catch { return null; }
+}
+function clearAuth() {
+  localStorage.removeItem('pool-auth');
+}
+
+// 6) Applique l’accès (affiche/masque portail et blocs admin)
+function applyAccessControls() {
+  const auth = getAuth();
+  const app = document.getElementById('app-root');
+  const gate = document.getElementById('access-gate');
+
+  if (auth) { gate.hidden = true; app.hidden = false; }
+  else      { gate.hidden = false; app.hidden = true; }
+
+  document.querySelectorAll('[data-role="manager-only"]').forEach(el => {
+    el.style.display = (auth && auth.role === 'manager') ? '' : 'none';
+  });
+}
+
+// 7) Essaie ?token=... ou #token=...
+async function tryTokenFromURL() {
+  const url = new URL(location.href);
+  const token = url.searchParams.get('token') ||
+                (location.hash.startsWith('#token=') ? location.hash.slice(7) : null);
+  if (!token) return false;
+
+  const res = await verifyToken(token);
+  const msg = document.getElementById('gate-msg');
+
+  if (res.ok) {
+    setAuth(res.payload.role, res.payload, token);
+    applyAccessControls();
+    return true;
+  } else {
+    if (msg) msg.textContent = `Token invalide : ${res.msg}`;
+    return false;
+  }
+}
+
+// 8) Collage manuel dans le portail
+function bindGateUI() {
+  const btn = document.getElementById('btn-try-token');
+  const ta  = document.getElementById('paste-token');
+  const msg = document.getElementById('gate-msg');
+
+  if (btn && ta) {
+    btn.onclick = async () => {
+      const token = ta.value.trim();
+      const res = await verifyToken(token);
+      if (res.ok) {
+        setAuth(res.payload.role, res.payload, token);
+        applyAccessControls();
+      } else {
+        msg.textContent = `Token invalide : ${res.msg}`;
+      }
+    };
+  }
+}
+
 // app.js
 import { State } from './state.js';
 import { CSV } from './csv.js';
@@ -284,7 +430,41 @@ function init(){
   document.querySelector('#draft-pooler').addEventListener('change', renderRosterView);
 }
 
-window.addEventListener('DOMContentLoaded', init);
+async function bootAuthThenApp() {
+  // 1) Auth en premier
+  bindGateUI();
+  await tryTokenFromURL();
+  applyAccessControls();
+
+  // ❌ Pas authentifié → on n'initialise pas l'app
+  if (document.getElementById('app-root').hidden) return;
+
+  // 2) ✅ Auth OK → on lance TON app (garde tes appels existants)
+  renderScoring(); bindScoring();
+  renderPlayers(); bindPlayers(); refreshPlayersDatalist();
+  renderPoolers(); bindPoolers(); refreshDraftPooler(); bindDraft();
+
+  // (si tu as le checkbox box-mode)
+  const cb = document.querySelector('#box-mode');
+  if (cb) {
+    cb.checked = !!state.boxRulesEnabled;
+    cb.onchange = (e)=>{ state.boxRulesEnabled = e.target.checked; State.save(state); };
+  }
+
+  bindStats(); bindLeagueIO();
+  computeAndRender();
+
+  // (si tu as ajouté la section "Statistiques des joueurs")
+  if (document.getElementById('player-stats-section')) bindPlayerStatsUI();
+
+  const draftSel = document.querySelector('#draft-pooler');
+  if (draftSel) draftSel.addEventListener('change', renderRosterView);
+
+  // (option) bouton déconnexion
+  setupLogoutButton && setupLogoutButton();
+}
+
+window.addEventListener('DOMContentLoaded', bootAuthThenApp);
 
 /***** =========================
  *  STATS DES JOUEURS (UI)
@@ -531,3 +711,17 @@ function bindPlayerStatsUI(){
   search.oninput = ()=> renderPlayerStatsTable(currentRows, search.value);
   btnExp.onclick = ()=> exportAggregatedCSV(currentRows);
 }
+
+
+function setupLogoutButton() {
+  const btnExit = document.getElementById('btn-exit-manager'); // s'il existe dans ton UI
+  if (btnExit) {
+    btnExit.hidden = false;
+    btnExit.onclick = () => {
+      clearAuth();
+      applyAccessControls();
+      alert('Déconnecté');
+    };
+  }
+}
+
