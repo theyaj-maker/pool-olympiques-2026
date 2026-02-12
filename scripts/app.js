@@ -829,22 +829,63 @@ function bindDraft(){
     renderPoolers(); renderRosterView(); computeAndRender();
   };
 }
-function renderRosterView(){
-  const cont = qs('#roster-view');
-  const poolerName = qs('#draft-pooler').value; const pl = state.poolers.find(p=>p.name===poolerName);
-  if(!pl){ cont.innerHTML=''; return; }
-  const picked = (pl.players||[]).map(n=>state.players.find(p=>p.name===n)).filter(Boolean);
+function renderRosterView() {
+  const cont = document.getElementById('roster-view');
+  if (!cont) return;
+
+  const poolerSelEl = document.getElementById('draft-pooler');
+  const poolerName = poolerSelEl ? poolerSelEl.value : null;
+  const pl = (state.poolers || []).find(p => p.name === poolerName);
+
+  cont.innerHTML = '';
+  if (!pl) return;
+
+  const auth = (typeof getAuth === 'function') ? getAuth() : null;
+  const role = auth?.role || 'viewer';
+  const canEdit = (role === 'manager');
+
+  const picked = (pl.players || [])
+    .map(n => state.players.find(p => p.name === n))
+    .filter(Boolean);
+
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th><th></th></tr></thead>';
+  table.innerHTML = `
+    <thead>
+      <tr><th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th>${canEdit ? '<th></th>' : ''}</tr>
+    </thead>`;
   const tbody = document.createElement('tbody');
-  picked.sort((a,b)=> (a.box||'').localeCompare(b.box||'') || a.position.localeCompare(b.position) || a.name.localeCompare(b.name)).forEach(p=>{
+
+  picked.sort((a,b) =>
+    (a.box||'').localeCompare(b.box||'') ||
+    a.position.localeCompare(b.position) ||
+    a.name.localeCompare(b.name)
+  ).forEach(p => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${p.name}</td><td>${p.position}</td><td>${p.team||''}</td><td>${p.box||''}</td>`;
-    const td = document.createElement('td');
-    const rm = document.createElement('button'); rm.className='secondary'; rm.textContent='Retirer'; rm.onclick=()=>{ pl.players = pl.players.filter(n=>n!==p.name); State.save(state); renderPoolers(); renderRosterView(); computeAndRender(); };
-    td.appendChild(rm); tr.appendChild(td); tbody.appendChild(tr);
+    tr.innerHTML = `
+      <td>${p.name}</td>
+      <td>${p.position}</td>
+      <td>${p.team || ''}</td>
+      <td>${p.box || ''}</td>`;
+    if (canEdit) {
+      const td = document.createElement('td');
+      const rm = document.createElement('button');
+      rm.className = 'secondary';
+      rm.textContent = 'Retirer';
+      rm.onclick = () => {
+        pl.players = (pl.players || []).filter(n => n !== p.name);
+        State.save(state);
+        renderPoolers();
+        renderRosterView();
+        computeAndRender();
+      };
+      td.appendChild(rm);
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
   });
-  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
+
+  table.appendChild(tbody);
+  cont.appendChild(table);
 }
 
 // --- Stats ingest ---
@@ -911,17 +952,42 @@ function computeScores(){
   totals.sort((a,b)=> b.points - a.points || a.pooler.localeCompare(b.pooler));
   return {totals};
 }
-function renderLeaderboard(res){
-  const cont = qs('#leaderboard');
+function renderLeaderboard() {
+  const cont = document.getElementById('leaderboard');
+  if (!cont) return;
+
+  const totals = computeScores();
+
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>#</th><th>Pooler</th><th>Points</th></tr></thead>';
+  table.innerHTML = `
+    <thead>
+      <tr><th>#</th><th>Pooler</th><th>Points</th></tr>
+    </thead>`;
   const tbody = document.createElement('tbody');
-  res.totals.forEach((row, i)=>{
+
+  if (!totals.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i+1}</td><td>${row.pooler}</td><td>${row.points.toFixed(1)}</td>`;
+    tr.innerHTML = `<td colspan="3"><em>Aucun pooler à afficher</em></td>`;
     tbody.appendChild(tr);
+  } else {
+    totals.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td><button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button></td>
+        <td><strong>${r.points.toFixed(1)}</strong></td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  table.appendChild(tbody);
+  cont.innerHTML = '';
+  cont.appendChild(table);
+
+  // Bind ouverture modale au clic
+  cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
+    btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
-  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
 }
 function bindLeagueIO(){
   qs('#export-league').onclick = ()=>{
@@ -938,6 +1004,172 @@ function bindLeagueIO(){
 function computeAndRender(){
   const res = computeScores();
   renderLeaderboard(res);
+}
+
+// Calcule les totaux par joueur pour un pooler, sur un intervalle
+function aggregatePoolerStats(poolerName, fromStr, toStr) {
+  const pooler = (state.poolers || []).find(p => p.name === poolerName);
+  if (!pooler) return [];
+
+  const roster = pooler.players || [];
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+
+  const s = state.scoring;
+  const rows = roster.map(name => {
+    const days = state.stats[name] || {};
+    let g=0,a=0,win=0,otl=0,so=0,pts=0;
+    Object.entries(days).forEach(([d,v]) => {
+      const dt = new Date(d + 'T12:00:00');
+      if (from && dt < from) return;
+      if (to   && dt > to)   return;
+      g += v.goals||0; a += v.assists||0; win += v.win||0; otl += v.otl||0; so += v.so||0;
+      pts += (v.goals||0)*s.goal + (v.assists||0)*s.assist +
+             (v.win||0)*s.goalie_win + (v.otl||0)*s.goalie_otl + (v.so||0)*s.shutout;
+    });
+    const meta = state.players.find(p => p.name === name) || {};
+    return { name, position: meta.position||'', team: meta.team||'', box: meta.box||'', g,a,win,otl,so,pts };
+  });
+
+  rows.sort((a,b) => b.pts - a.pts || a.name.localeCompare(b.name));
+  return rows;
+}
+
+function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
+  const cont = document.getElementById('pooler-players-table');
+  if (!cont) return;
+
+  const rows = aggregatePoolerStats(poolerName, fromStr, toStr);
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Joueur</th><th>Pos</th><th>Équipe</th><th>Boîte</th>
+        <th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th><th>Détail</th>
+      </tr>
+    </thead>`;
+  const tbody = document.createElement('tbody');
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.name}</td><td>${r.position}</td><td>${r.team}</td><td>${r.box||''}</td>
+      <td>${r.g}</td><td>${r.a}</td><td>${r.win}</td><td>${r.otl}</td><td>${r.so}</td>
+      <td><strong>${r.pts.toFixed(1)}</strong></td>
+      <td><button class="secondary" data-open-player="${r.name}">Voir</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  cont.innerHTML = '';
+  cont.appendChild(table);
+
+  // Ouvre le détail quotidien du joueur
+  cont.querySelectorAll('[data-open-player]').forEach(btn => {
+    btn.onclick = () => {
+      const name = btn.getAttribute('data-open-player');
+      const from = document.getElementById('pooler-from').value || '';
+      const to   = document.getElementById('pooler-to').value   || '';
+      renderPoolerDailyTable(poolerName, name, from, to);
+    };
+  });
+
+  // Vide la table quotidienne tant qu’aucun joueur n’est sélectionné
+  document.getElementById('pooler-daily-title').style.display = 'none';
+  document.getElementById('pooler-daily-table').innerHTML = '';
+}
+
+function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
+  const title = document.getElementById('pooler-daily-title');
+  const cont  = document.getElementById('pooler-daily-table');
+  if (!title || !cont) return;
+
+  title.textContent = `Détail par date — ${playerName}`;
+  title.style.display = '';
+
+  const s = state.scoring;
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+
+  const days = state.stats[playerName] || {};
+  const data = Object.entries(days)
+    .filter(([d]) => {
+      const dt = new Date(d + 'T12:00:00');
+      if (from && dt < from) return false;
+      if (to   && dt > to)   return false;
+      return true;
+    })
+    .sort(([a],[b]) => a.localeCompare(b))
+    .map(([d,v]) => ({
+      date: d,
+      goals: v.goals||0,
+      assists: v.assists||0,
+      win: v.win||0,
+      otl: v.otl||0,
+      so: v.so||0,
+      pts: (v.goals||0)*s.goal + (v.assists||0)*s.assist +
+           (v.win||0)*s.goalie_win + (v.otl||0)*s.goalie_otl + (v.so||0)*s.shutout
+    }));
+
+  const table = document.createElement('table');
+  table.innerHTML = `
+    <thead>
+      <tr><th>Date</th><th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th></tr>
+    </thead>`;
+  const tbody = document.createElement('tbody');
+
+  let sum = {g:0,a:0,win:0,otl:0,so:0,pts:0};
+  data.forEach(r => {
+    sum.g += r.goals; sum.a += r.assists; sum.win += r.win; sum.otl += r.otl; sum.so += r.so; sum.pts += r.pts;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.date}</td><td>${r.goals}</td><td>${r.assists}</td>
+      <td>${r.win}</td><td>${r.otl}</td><td>${r.so}</td><td><strong>${r.pts.toFixed(1)}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // ligne total
+  const trSum = document.createElement('tr');
+  trSum.innerHTML = `
+    <td><strong>Total</strong></td>
+    <td><strong>${sum.g}</strong></td><td><strong>${sum.a}</strong></td>
+    <td><strong>${sum.win}</strong></td><td><strong>${sum.otl}</strong></td><td><strong>${sum.so}</strong></td>
+    <td><strong>${sum.pts.toFixed(1)}</strong></td>`;
+  tbody.appendChild(trSum);
+
+  table.appendChild(tbody);
+  cont.innerHTML = '';
+  cont.appendChild(table);
+}
+
+function openPoolerModal(poolerName) {
+  const dlg = document.getElementById('pooler-modal');
+  if (!dlg) return;
+
+  // Déterminer min/max dates des stats du pooler
+  const roster = (state.poolers || []).find(p => p.name === poolerName)?.players || [];
+  const dateSet = new Set();
+  roster.forEach(name => Object.keys(state.stats[name] || {}).forEach(d => dateSet.add(d)));
+  const dates = Array.from(dateSet).sort();
+  const minD = dates[0] || '';
+  const maxD = dates[dates.length-1] || '';
+
+  document.getElementById('pooler-modal-title').textContent = `Vue — ${poolerName}`;
+  document.getElementById('pooler-from').value = minD;
+  document.getElementById('pooler-to').value   = maxD;
+
+  // Rendu initial
+  renderPoolerPlayersTable(poolerName, minD, maxD);
+
+  // Bind filtres
+  document.getElementById('pooler-apply').onclick = () => {
+    const f = document.getElementById('pooler-from').value;
+    const t = document.getElementById('pooler-to').value;
+    renderPoolerPlayersTable(poolerName, f, t);
+  };
+  document.getElementById('pooler-close').onclick = () => dlg.close();
+
+  dlg.showModal();
 }
 
 function init(){
@@ -980,6 +1212,10 @@ if (document.getElementById('players-list')) {
   bindStats();                bindRemoteSourcesUI();
   computeAndRender();
 
+  const recomputeBtn = document.getElementById('recompute');
+if (recomputeBtn) {
+  recomputeBtn.onclick = () => computeAndRender();
+}
   // Changement de pooler -> maj du roster
   const draftSel = document.getElementById('draft-pooler');
   if (draftSel) draftSel.addEventListener('change', renderRosterView);
