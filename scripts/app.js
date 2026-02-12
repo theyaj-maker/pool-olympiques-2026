@@ -7,14 +7,14 @@
 
 // 1) <<< Colle ici ta CLÉ PUBLIQUE JWK (non secrète) générée au §4 >>>
 const PUBLIC_JWK = {
- "crv": "P-256",
+ crv": "P-256",
   "ext": true,
   "key_ops": [
     "verify"
   ],
   "kty": "EC",
-  "x": "t8DrGQPjmyMurI7wZbdkG0hIuKenVS4BaU2GVsQCApY",
-  "y": "Dp2GtxujxfNxM3RJo_xuXA7u9fzipLPmovXWqkNt1_c"
+  "x": "a-k-B7MaXuGaDEBiP9ujxprPuXLcNsAhYwBKXIrqLTA",
+  "y": "DyZGnjQdPX_eJQG81j3mYR8dlaASB6X_mqH17VjAYWU"
 };
 
 // 2) Helpers base64url
