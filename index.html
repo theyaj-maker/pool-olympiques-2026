@@ -74,6 +74,10 @@
         </div>
         <div>
           <h3>Repêchage / Sélection</h3>
+          
+<!-- Tout le bloc Repêchage devient manager-only -->
+  <div id="draft-area" data-role="manager-only">
+
           <label><input type="checkbox" id="box-mode"> Règles de boîtes B1..B10 / G1 / G2 / BONUS</label>
           <label>Pooler <select id="draft-pooler"></select></label>
 
@@ -93,7 +97,7 @@
               <button id="box-draft-clear" class="secondary">Effacer</button>
             </div>
           </div>
-
+</div>
           <div id="roster-view" class="table"></div>
         </div>
       </div>
@@ -121,11 +125,36 @@
       </div>
     </section>
 
-    <!-- LEADERBOARD -->
-    <section class="card" id="leaderboard-section">
-      <h2>Classement</h2>
-      <div id="leaderboard" class="table"></div>
-    </section>
+    
+<!-- === Classement === -->
+<section class="card" id="leaderboard-section">
+  <h2>Classement</h2>
+
+  <!-- Bouton gestion : recalcul -->
+  <div class="actions" data-role="manager-only">
+    <button id="recompute">Recalculer le classement</button>
+  </div>
+
+  <div id="leaderboard" class="table"></div>
+
+  <!-- Modale : vue d’un pooler (joueurs + détail par dates) -->
+  <dialog id="pooler-modal">
+    <h3 id="pooler-modal-title">Vue du pooler</h3>
+    <div class="actions">
+      <label>Du <input id="pooler-from" type="date"></label>
+      <label>Au <input id="pooler-to" type="date"></label>
+      <button id="pooler-apply">Filtrer</button>
+      <button id="pooler-close" class="secondary">Fermer</button>
+    </div>
+
+    <h4>Joueurs et points</h4>
+    <div id="pooler-players-table" class="table"></div>
+
+    <h4 id="pooler-daily-title" style="display:none;"></h4>
+    <div id="pooler-daily-table" class="table"></div>
+  </dialog>
+</section>
+
 
     <!-- PLAYER STATS -->
     <section class="card" id="player-stats-section">
