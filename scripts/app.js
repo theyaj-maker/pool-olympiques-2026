@@ -266,7 +266,7 @@ async function loadPoolersFromCSV(url){
 
   state.poolers = newPoolers;
   State.save(state);
-  renderPoolers(); refreshDraftPooler(); renderRosterView();
+  renderPoolers(); refreshDraftPooler(); renderRosterView();computeAndRender();
 }
 
 async function refreshAllRemote(){
@@ -666,6 +666,7 @@ function bindPlayers() {
       renderPlayers('');
       refreshPlayersDatalist();
       renderBoxDraftUI();
+      computeAndRender();
     };
   }
 
@@ -701,6 +702,7 @@ function bindPlayers() {
       renderPlayers('');
       refreshPlayersDatalist();
       renderBoxDraftUI();
+      computeAndRender();
     };
   }
 
@@ -763,7 +765,7 @@ function importPlayersFromCSV(text){
       state.players.push({name, position: r[idx.position]||'F', team: (r[idx.team]||'').toUpperCase(), box: idx.box>=0 ? (r[idx.box]||'') : ''});
     }
   });
-  State.save(state); renderPlayers(); refreshPlayersDatalist();
+  State.save(state); renderPlayers(); refreshPlayersDatalist();computeAndRender();
   renderBoxDraftUI();
 }
 
@@ -942,24 +944,50 @@ function bindStats() {
   }
 }
 
-// --- Compute leaderboard ---
-function computeScores(){
-  const s = state.scoring;
-  const totals = [];
-  state.poolers.forEach(pl=>{
+// =====================================================
+// CLASSEMENT – calcul des points par pooler
+// =====================================================
+function computeScores() {
+  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  const out = [];
+
+  // Si aucun pooler, renvoyer tableau vide (le rendu gérera)
+  const poolers = state.poolers || [];
+  const statsByPlayer = state.stats || {};
+
+  poolers.forEach(pl => {
+    const roster = pl.players || [];
     let sum = 0;
-    (pl.players||[]).forEach(name=>{
-      const days = state.stats[name] || {};
-      Object.values(days).forEach(vals=>{
-        const pts = (vals.goals||0)*s.goal + (vals.assists||0)*s.assist + (vals.win||0)*s.goalie_win + (vals.otl||0)*s.goalie_otl + (vals.so||0)*s.shutout;
-        sum += pts;
+
+    roster.forEach(name => {
+      const days = statsByPlayer[name] || {};
+      // Somme toutes les dates disponibles pour ce joueur
+      Object.values(days).forEach(v => {
+        sum += (v.goals   || 0) * s.goal
+             + (v.assists || 0) * s.assist
+             + (v.win     || 0) * s.goalie_win
+             + (v.otl     || 0) * s.goalie_otl
+             + (v.so      || 0) * s.shutout;
       });
     });
-    totals.push({pooler: pl.name, points: sum});
+
+    out.push({ pooler: pl.name, points: sum, rosterCount: roster.length });
   });
-  totals.sort((a,b)=> b.points - a.points || a.pooler.localeCompare(b.pooler));
-  return {totals};
+
+  // Tri par points décroissants puis nom
+  out.sort((a, b) => b.points - a.points || a.pooler.localeCompare(b.pooler));
+
+  // Log utile 1x pour contrôler l’état
+  try {
+    console.log('[computeScores] poolers=', out.map(t => `${t.pooler}(${t.rosterCount})`).join(', '),
+                'statsPlayers=', Object.keys(statsByPlayer).length);
+  } catch (_) {}
+
+  return out;
 }
+
+// Exposer pour debug en console (facultatif mais pratique)
+window.computeScores = computeScores;
 function renderLeaderboard() {
   const cont = document.getElementById('leaderboard');
   if (!cont) return;
@@ -1020,9 +1048,11 @@ function bindLeagueIO(){
 }
 
 function computeAndRender(){
-  const res = computeScores();
-  renderLeaderboard(res);
+  
+renderLeaderboard();
 }
+window.computeAndRender = computeAndRender; // debug console
+
 
 // Calcule les totaux par joueur pour un pooler, sur un intervalle
 function aggregatePoolerStats(poolerName, fromStr, toStr) {
