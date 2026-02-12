@@ -270,6 +270,44 @@ async function refreshAllRemote(){
   await Promise.all(ops);
   computeAndRender();
 }
+
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+//  Fonction demandée : bindRemoteSourcesUI()
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+function bindRemoteSourcesUI(){
+  const { poolersUrl, rostersUrl, statsUrl } = getRemoteSources();
+
+  // Remplir les inputs (si présents dans l’UI manager-only)
+  const elP = document.getElementById('poolers-url');
+  const elR = document.getElementById('rosters-url');
+  if (elP && poolersUrl) elP.value = poolersUrl;
+  if (elR && rostersUrl) elR.value = rostersUrl;
+
+  // Sauvegarder
+  const btnSave = document.getElementById('save-remote-sources');
+  if (btnSave) {
+    btnSave.onclick = () => {
+      const src = getRemoteSources();
+      const p = document.getElementById('poolers-url');
+      const r = document.getElementById('rosters-url');
+      if (p) src.poolersUrl = (p.value || '').trim();
+      if (r) src.rostersUrl = (r.value || '').trim();
+      setRemoteSources(src);
+      alert('Sources sauvegardées.');
+    };
+  }
+
+  // Rafraîchir maintenant (Poolers+Rosters+Stats)
+  const btnRef = document.getElementById('refresh-remote');
+  if (btnRef) btnRef.onclick = () => refreshAllRemote();
+
+  // Premier chargement auto si on a déjà des URLs mémorisées
+  if (poolersUrl || rostersUrl || statsUrl) {
+    refreshAllRemote().catch(console.warn);
+  }
+}
+
 /***** =======================================================
  *  SÉLECTION PAR BOÎTES (B1..B10, G1, G2, BONUS x5)
  *========================================================= ***/
