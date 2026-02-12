@@ -814,21 +814,31 @@ async function ingestStatsFromCSVText(text){
   computeAndRender();
   qs('#last-update').textContent = `Dernière mise à jour: ${new Date(state.lastUpdate).toLocaleString()}`;
 }
-function bindStats(){
-  qs('#fetch-stats').onclick = async ()=>{
-    const url = qs('#stats-url').value.trim(); if(!url) return alert('Entrez une URL');
-    const text = await fetch(url, {cache:'no-store'}).then(r=>r.text());
-    ingestStatsFromCSVText(text);
-  };
-  qs('#stats-file').onchange = async (e)=>{
-    const file = e.target.files[0]; if(!file) return; const text = await file.text(); ingestStatsFromCSVText(text);
-  };
-  qs('#import-stats-file').onclick = ()=> qs('#stats-file').click();
-  qs('#auto-refresh').onchange = (e)=>{
-    if(e.target.checked){
-      autoTimer = setInterval(()=> qs('#fetch-stats').click(), 5*60*1000);
-    } else { if(autoTimer) clearInterval(autoTimer); }
-  };
+function bindStats() {
+  // Bouton "Mettre à jour maintenant"
+  const fetchBtn = document.getElementById('fetch-stats');
+  if (fetchBtn) {
+    fetchBtn.onclick = async () => {
+      const urlEl = document.getElementById('stats-url');
+      const url = (urlEl && urlEl.value || '').trim();
+      if (!url) return alert('Entrer URL CSV des Stats (publié)');
+      const txt = await fetch(url, { cache: 'no-store' }).then(r => r.text());
+      await ingestStatsFromCSVText(txt);
+    };
+  }
+
+  // Case "Rafraîchir toutes les 5 min" (présente seulement côté manager)
+  const auto = document.getElementById('auto-refresh');
+  if (auto) {
+    auto.onchange = (e) => {
+      if (e.target.checked) {
+        setInterval(() => {
+          // Rafraîchit Poolers + Rosters + Stats
+          refreshAllRemote().catch(console.warn);
+        }, REFRESH_INTERVAL_MS);
+      }
+    };
+  }
 }
 
 // --- Compute leaderboard ---
@@ -922,22 +932,24 @@ if (document.getElementById('players-list')) {
   const draftSel = document.getElementById('draft-pooler');
   if (draftSel) draftSel.addEventListener('change', renderRosterView);
 
-  // 4) Auto‑refresh forcé pour les VISITEURS (viewer) toutes les 5 minutes
-  const auth = (typeof getAuth === 'function') ? getAuth() : null;
-  const role = auth?.role || 'viewer';
+  
+// 4) Auto‑refresh forcé pour VISITEUR (viewer) : toutes les 5 min
+const auth = (typeof getAuth === 'function') ? getAuth() : null;
+const role = auth?.role || 'viewer';
 
-  if (role === 'viewer') {
-    // Cache la case "Rafraîchir toutes les 5 min" côté viewer (on force ON)
-    const autoCb = document.getElementById('auto-refresh');
-    if (autoCb && autoCb.closest('label')) {
-      autoCb.closest('label').style.display = 'none';
-    }
-
-    // Rafraîchit Poolers + Rosters + Stats périodiquement
-    setInterval(() => {
-      refreshAllRemote().catch(console.warn);
-    }, REFRESH_INTERVAL_MS);
+if (role === 'viewer') {
+  // Cache la case côté viewer si elle existe
+  const autoCb = document.getElementById('auto-refresh');
+  if (autoCb && autoCb.closest('label')) {
+    autoCb.closest('label').style.display = 'none';
   }
+
+  // Rafraîchit Poolers + Rosters + Stats périodiquement
+  setInterval(() => {
+    refreshAllRemote().catch(console.warn);
+  }, REFRESH_INTERVAL_MS);
+}
+
 }
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
