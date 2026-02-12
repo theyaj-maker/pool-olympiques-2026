@@ -12,7 +12,22 @@
     <p class="subtitle">Gestion des poolers, repêchage, calcul des points en direct (ou fin de journée)</p>
   </header>
 
-  <main>
+<!-- Portail d'accès (affiché tant qu'aucun token valide n'est présenté) -->
+  <div id="access-gate" class="gate">
+    <h2>Accès requis</h2>
+    <p>Ce site est protégé. Ouvre l’URL contenant un <em>token</em> valide.<br>
+       Ou colle un jeton signé ci-dessous.</p>
+    <textarea id="paste-token" placeholder="Coller ici le token signé" rows="4"></textarea>
+    <div class="actions">
+      <button id="btn-try-token">Entrer</button>
+    </div>
+    <p id="gate-msg" class="muted"></p>
+  </div>
+
+  
+<!-- Ton appli existante -->
+  <main id="app-root" hidden>
+
     <section class="card" id="scoring-section">
       <h2>Paramètres de pointage</h2>
       <div class="grid-2">
