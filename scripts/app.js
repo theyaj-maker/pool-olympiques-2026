@@ -163,6 +163,113 @@ const qs = (s) => document.querySelector(s);
 
 const state = State.load();
 
+/***** =========================================
+ * SOURCES DISTANTES (CSV publiés - Google Sheets)
+ *  - Poolers : pooler,skaters,goalies
+ *  - Rosters : pooler,player[,position,team,box]
+ *  - Stats   : (déjà géré par stats-url existant)
+ *=========================================== ***/
+
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+// On stocke les URLs dans localStorage (clé dédiée)
+const REMOTE_KEY = 'pool-remote-sources';
+
+function getRemoteSources(){
+  try{
+    const raw = localStorage.getItem(REMOTE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(_) {}
+  return { poolersUrl:'', rostersUrl:'', statsUrl:'' }; // statsUrl peut rester vide si géré par l'UI existante
+}
+
+function setRemoteSources(s){
+  localStorage.setItem(REMOTE_KEY, JSON.stringify(s));
+}
+
+// Option "bootstrap par URL" : ?poolers=...&rosters=...&stats=...
+function takeRemoteFromURL(){
+  const u = new URL(location.href);
+  const src = getRemoteSources();
+  let changed = false;
+  ['poolers','rosters','stats'].forEach(k=>{
+    const v = u.searchParams.get(k);
+    if(v){ src[k+'Url'] = v; changed = true; }
+  });
+  if(changed) setRemoteSources(src);
+}
+
+async function fetchTextNoCache(url){
+  if(!url) return '';
+  const r = await fetch(url, { cache:'no-store' });
+  if(!r.ok) throw new Error(`HTTP ${r.status} sur ${url}`);
+  return await r.text();
+}
+
+// Poolers CSV attendu : pooler,skaters,goalies
+async function loadPoolersFromCSV(url){
+  if(!url) return;
+  const text = await fetchTextNoCache(url);
+  if(!text) throw new Error('Poolers CSV vide');
+
+  const rows = CSV.parse(text);
+  if(!rows.length) throw new Error('Poolers CSV: aucune ligne');
+
+  const header = rows.shift().map(h=>h.toLowerCase().trim());
+  const idx = {
+    pooler: header.indexOf('pooler'),
+    skaters: header.indexOf('skaters'),
+    goalies: header.indexOf('goalies'),
+  };
+  if(idx.pooler<0 || idx.skaters<0 || idx.goalies<0){
+    throw new Error('Poolers CSV: en-têtes requis = pooler,skaters,goalies');
+  }
+
+  // On préserve les rosters existants (si Rosters CSV non fourni)
+  const byName = Object.create(null);
+  state.poolers.forEach(p=> byName[p.name.toLowerCase()] = p);
+
+  const newPoolers = [];
+  rows.forEach(r=>{
+    const name = (r[idx.pooler]||'').toString().trim();
+    if(!name) return;
+    const sk = parseInt(r[idx.skaters]||'15',10) || 15;
+    const go = parseInt(r[idx.goalies]||'2',10) || 2;
+
+    const existing = byName[name.toLowerCase()];
+    newPoolers.push({
+      name,
+      roster: { skaters: sk, goalies: go },
+      players: existing ? (existing.players||[]) : [] // roster conservé tant que Rosters CSV n’écrase pas
+    });
+  });
+
+  state.poolers = newPoolers;
+  State.save(state);
+  renderPoolers(); refreshDraftPooler(); renderRosterView();
+}
+
+async function refreshAllRemote(){
+  const src = getRemoteSources();
+  const ops = [];
+
+  if(src.poolersUrl){
+    ops.push(loadPoolersFromCSV(src.poolersUrl).catch(e=>console.warn('Poolers CSV:', e.message||e)));
+  }
+  if(src.rostersUrl){
+    ops.push(loadRostersFromCSV(src.rostersUrl).catch(e=>console.warn('Rosters CSV:', e.message||e)));
+  }
+
+  // Stats : si tu veux forcer la même logique dans un seul bouton
+  const statsUrlEl = document.getElementById('stats-url');
+  const statsUrl = (statsUrlEl && statsUrlEl.value) ? statsUrlEl.value.trim() : (src.statsUrl||'');
+  if(statsUrl){
+    ops.push(fetchTextNoCache(statsUrl).then(ingestStatsFromCSVText).catch(e=>console.warn('Stats CSV:', e.message||e)));
+  }
+
+  await Promise.all(ops);
+  computeAndRender();
+}
 /***** =======================================================
  *  SÉLECTION PAR BOÎTES (B1..B10, G1, G2, BONUS x5)
  *========================================================= ***/
@@ -651,6 +758,11 @@ async function bootAuthThenApp() {
   // ❌ Pas authentifié → on n'initialise pas l'app
   if (document.getElementById('app-root').hidden) return;
 
+
+  
+// --- au tout début (avant de lancer l’app), récupère les URLs si passées en query ---
+takeRemoteFromURL();
+
   // 2) ✅ Auth OK → on lance TON app (garde tes appels existants)
   renderScoring(); bindScoring();
   renderPlayers(); bindPlayers(); refreshPlayersDatalist();
@@ -669,6 +781,58 @@ bindBoxDraft();
 
   bindStats(); bindLeagueIO();
   computeAndRender();
+
+  
+// --- après avoir construit le DOM et rendu l'app ---
+(function bindRemoteSourcesUI(){
+  const { poolersUrl, rostersUrl, statsUrl } = getRemoteSources();
+
+  // Remplir les inputs si présents (manager-only)
+  const elP = document.getElementById('poolers-url');
+  const elR = document.getElementById('rosters-url');
+  if(elP && poolersUrl) elP.value = poolersUrl;
+  if(elR && rostersUrl) elR.value = rostersUrl;
+
+  const btnSave = document.getElementById('save-remote-sources');
+  if(btnSave){
+    btnSave.onclick = ()=>{
+      const src = getRemoteSources();
+      const p = document.getElementById('poolers-url');
+      const r = document.getElementById('rosters-url');
+      if(p) src.poolersUrl = (p.value||'').trim();
+      if(r) src.rostersUrl = (r.value||'').trim();
+      setRemoteSources(src);
+      alert('Sources sauvées.'); 
+    };
+  }
+
+  const btnRef = document.getElementById('refresh-remote');
+  if(btnRef) btnRef.onclick = ()=> refreshAllRemote();
+
+  // Premier chargement commun (si URLs déjà présentes)
+  if(poolersUrl || rostersUrl || statsUrl){
+    refreshAllRemote().catch(console.warn);
+  }
+})();
+
+// --- Auto-refresh : VIEWER = toujours actif; MANAGER = comme avant ---
+(function setupAutoRefreshRoles(){
+  const auth = (typeof getAuth === 'function') ? getAuth() : null;
+  const role = auth?.role || 'viewer';
+
+  // Masquer le checkbox "auto-refresh" aux viewers (et forcer ON)
+  const autoCb = document.getElementById('auto-refresh');
+  if(role === 'viewer'){
+    if(autoCb){ autoCb.closest('label').style.display = 'none'; } // cache l’option
+    // Forcer un timer global combiné (poolers+rosters+stats)
+    setInterval(()=> refreshAllRemote().catch(console.warn), REFRESH_INTERVAL_MS);
+  } else {
+    // côté manager : on laisse le comportement existant
+    // (ton bindStats() gérait déjà #auto-refresh pour les stats)
+    // On peut en plus lancer un rafraîchissement combiné à intervalle si tu veux :
+    // setInterval(()=> refreshAllRemote().catch(console.warn), REFRESH_INTERVAL_MS);
+  }
+})();
 
   const btnExport = document.getElementById('export-poolers');
 if(btnExport) btnExport.onclick = exportPoolersCSV;
