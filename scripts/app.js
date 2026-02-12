@@ -547,52 +547,98 @@ function refreshPlayersDatalist(){
   dl.innerHTML = state.players.sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.name}">${p.name} (${p.position}-${p.team||''}) [${p.box||'-'}]</option>`).join('');
 }
 function bindPlayers() {
-  const addBtn = document.getElementById('add-player');
-  const search = document.getElementById('player-search');
-  const importUrlBtn = document.getElementById('import-players-url');
+  // Récupère toutes les références d’éléments (peuvent être null si la section n’existe pas)
+  const addBtn        = document.getElementById('add-player');
+  const search        = document.getElementById('player-search');
+  const importUrlBtn  = document.getElementById('import-players-url');
   const importFileBtn = document.getElementById('import-players-file');
-  const fileInput = document.getElementById('players-file');
-  const exportBtn = document.getElementById('export-players');
+  const fileInput     = document.getElementById('players-file');
+  const exportBtn     = document.getElementById('export-players');
 
-  // Si la section n'existe pas (mode viewer ou HTML épuré), on sort tranquillement
-  if (!addBtn && !search && !importUrlBtn && !importFileBtn && !exportBtn) return;
+  // Si aucun des contrôles n'est présent, on sort : la section "Joueurs" n'est probablement pas dans l'HTML.
+  if (!addBtn && !search && !importUrlBtn && !importFileBtn && !fileInput && !exportBtn) {
+    return;
+  }
 
+  // Helper normalisation + push d’un joueur (utilisé par les imports)
   const normalizePush = (header, idx, r) => {
     const name = r[idx.name];
     if (!name) return;
-    if (state.players.find(p => p.name.toLowerCase() === name.toLowerCase())) return;
 
-    const pos = ((r[idx.position] || 'F').toString().trim().toUpperCase());
-    const posN = pos.startsWith('G') ? 'G' : (pos.startsWith('D') ? 'D' : 'F');
-    const team = ((r[idx.team] || '').toString().trim().toUpperCase());
+    // Pas de doublon par nom (case-insensitive)
+    if (state.players.find(p => p.name.toLowerCase() === String(name).toLowerCase())) return;
+
+    // Position normalisée
+    const posRaw = ((r[idx.position] || 'F').toString().trim().toUpperCase());
+    const posN   = posRaw.startsWith('G') ? 'G' : (posRaw.startsWith('D') ? 'D' : 'F');
+
+    // Équipe en MAJ
+    const team   = ((r[idx.team] || '').toString().trim().toUpperCase());
+
+    // Boîte normalisée (B1..B10 | G1 | G2 | BONUS)
     const rawBox = (idx.box >= 0 ? (r[idx.box] || '') : '').toString().trim().toUpperCase();
-    const box = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(rawBox) ? rawBox : '';
-    
-state.players.push({
-  name,
-  position: posN,
-  team,
-  box
-});
+    const box    = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(rawBox) ? rawBox : '';
 
+    state.players.push({ name, position: posN, team, box });
+  };
 
+  // Ajout manuel
+  if (addBtn) {
+    addBtn.onclick = () => {
+      const nameEl = document.getElementById('player-name');
+      const posEl  = document.getElementById('player-position');
+      const teamEl = document.getElementById('player-team');
+      if (!nameEl || !posEl || !teamEl) return;
+
+      const name     = nameEl.value.trim();
+      const position = posEl.value; // 'F' | 'D' | 'G'
+      const team     = teamEl.value.trim().toUpperCase();
+
+      if (!name) return alert('Nom requis');
+      if (state.players.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+        return alert('Déjà présent');
+      }
+
+      state.players.push({ name, position, team, box: '' });
+      State.save(state);
+
+      nameEl.value = '';
+      teamEl.value = '';
+
+      renderPlayers('');
+      refreshPlayersDatalist();
+      renderBoxDraftUI();
+    };
+  }
+
+  // Recherche live
+  if (search) {
+    search.oninput = (e) => renderPlayers(e.target.value);
+  }
+
+  // Import via URL CSV (Google Sheets publié)
   if (importUrlBtn) {
     importUrlBtn.onclick = async () => {
       const urlEl = document.getElementById('players-import-url');
       if (!urlEl) return;
+
       const url = (urlEl.value || '').trim();
       if (!url) return;
-      const text = await fetch(url, { cache: 'no-store' }).then(r => r.text());
-      const rows = CSV.parse(text);
+
+      const text  = await fetch(url, { cache: 'no-store' }).then(r => r.text());
+      const rows  = CSV.parse(text);
       if (!rows.length) return;
+
       const header = rows.shift().map(h => h.toLowerCase());
-      const idx = {
-        name: header.indexOf('name'),
+      const idx    = {
+        name:     header.indexOf('name'),
         position: header.indexOf('position'),
-        team: header.indexOf('team'),
-        box: header.indexOf('box')
+        team:     header.indexOf('team'),
+        box:      header.indexOf('box'),
       };
+
       rows.forEach(r => normalizePush(header, idx, r));
+
       State.save(state);
       renderPlayers('');
       refreshPlayersDatalist();
@@ -600,23 +646,30 @@ state.players.push({
     };
   }
 
-  if (importFileBtn) importFileBtn.onclick = () => fileInput && fileInput.click();
+  // Import via fichier CSV
+  if (importFileBtn) {
+    importFileBtn.onclick = () => { if (fileInput) fileInput.click(); };
+  }
 
   if (fileInput) {
-    fileInput.onchange = async e => {
+    fileInput.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      const text = await file.text();
-      const rows = CSV.parse(text);
+
+      const text  = await file.text();
+      const rows  = CSV.parse(text);
       if (!rows.length) return;
+
       const header = rows.shift().map(h => h.toLowerCase());
-      const idx = {
-        name: header.indexOf('name'),
+      const idx    = {
+        name:     header.indexOf('name'),
         position: header.indexOf('position'),
-        team: header.indexOf('team'),
-        box: header.indexOf('box')
+        team:     header.indexOf('team'),
+        box:      header.indexOf('box'),
       };
+
       rows.forEach(r => normalizePush(header, idx, r));
+
       State.save(state);
       renderPlayers('');
       refreshPlayersDatalist();
@@ -624,44 +677,21 @@ state.players.push({
     };
   }
 
+  // Export CSV
   if (exportBtn) {
     exportBtn.onclick = () => {
       const header = 'name,position,team,box\n';
       const body = (state.players || [])
         .map(p => `${CSV.escape(p.name)},${p.position},${p.team || ''},${p.box || ''}`)
         .join('\n');
+
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([header + body], { type: 'text/csv' }));
+      a.href = URL.createObjectURL(new Blob([header + body], { type: 'text/csv;charset=utf-8;' }));
       a.download = 'players.csv';
       a.click();
     };
   }
 }
-  };
-
-  if (addBtn) {
-    addBtn.onclick = () => {
-      const nameEl = document.getElementById('player-name');
-      const posEl = document.getElementById('player-position');
-      const teamEl = document.getElementById('player-team');
-      if (!nameEl || !posEl || !teamEl) return;
-
-      const name = nameEl.value.trim();
-      const position = posEl.value;
-      const team = teamEl.value.trim().toUpperCase();
-      if (!name) return alert('Nom requis');
-      if (state.players.find(p => p.name.toLowerCase() === name.toLowerCase()))
-        return alert('Déjà présent');
-
-      state.players.push({ name, position, team, box: '' });
-      State.save(state);
-      nameEl.value = '';
-      teamEl.value = '';
-      renderPlayers('');
-      refreshPlayersDatalist();
-      renderBoxDraftUI();
-    };
-  }
 
 
 function importPlayersFromCSV(text){
