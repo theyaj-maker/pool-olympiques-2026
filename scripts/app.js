@@ -159,9 +159,17 @@ import { State } from './state.js';
 import { CSV } from './csv.js';
 import { Adapters } from './adapters.js';
 
+
+
 const qs = (s) => document.querySelector(s);
 
-const state = State.load();
+// --- Initialisation centrale du state (une seule fois) ---
+const __existing = window.__POOL_STATE__;
+export const state = __existing || State.load();
+if (!__existing) {
+  window.__POOL_STATE__ = state;   // persiste au niveau global (utile pour console/outils)
+  window.state = state;            // alias pratique pour debug
+}
 
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
