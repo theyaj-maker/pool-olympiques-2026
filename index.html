@@ -1,1 +1,220 @@
-<!DOCTYPE html> <html lang="fr"> <head> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1" /> <title>Pool Hockey – Olympiques 2026</title> styles.css </head> <body class="hide-legacy-draft"> <!-- ========================================================= --> <!-- 🔐 PORTAIL D’ACCÈS (TOKEN SIGNÉ) --> <!-- ========================================================= --> <div id="access-gate" class="gate"> <h2>Accès requis</h2> <p> Ce site est protégé. Ouvre l’URL contenant un <strong>token</strong> valide ou colle-le ci‑dessous. </p> <textarea id="paste-token" placeholder="Coller ici le token signé" rows="4"></textarea> <div class="actions"> <button id="btn-try-token">Entrer</button> </div> <p id="gate-msg" class="muted"></p> </div> <!-- ========================================================= --> <!-- 🧩 APPLICATION PRINCIPALE (MASQUÉE SI PAS AUTHENTIFIÉ) --> <!-- ========================================================= --> <main id="app-root" hidden> <!-- SCORING — manager-only --> <section class="card" id="scoring-section" data-role="manager-only"> <h2>Paramètres de pointage</h2> <div class="grid-2"> <label>Points par but <input id="pts-goal" type="number" value="1"></label> <label>Points par passe <input id="pts-assist" type="number" value="1"></label> <label>Victoire gardien <input id="pts-win" type="number" value="2"></label> <label>Défaite OT/TB gardien <input id="pts-otl" type="number" value="1"></label> <label>Blanchissage <input id="pts-so" type="number" value="3"></label> </div> <button id="save-scoring">Sauvegarder</button> <button id="reset-scoring" class="secondary">Réinitialiser</button> </section> <!-- PLAYERS MASTER — manager-only --> <section class="card" id="players-section" data-role="manager-only"> <h2>Joueurs (liste maîtresse)</h2> <div class="grid-2"> <div> <div class="actions"> <input id="player-name" placeholder="Nom"> <select id="player-position"> <option value="F">Attaquant</option> <option value="D">Défenseur</option> <option value="G">Gardien</option> </select> <input id="player-team" placeholder="Équipe (CAN)"> <button id="add-player">Ajouter</button> </div> <div class="actions"> <input id="players-import-url" placeholder="URL CSV Google Sheets (publié)"> <button id="import-players-url" class="secondary">Importer URL</button> <input id="players-file" type="file" accept=".csv" hidden> <button id="import-players-file" class="secondary">Importer fichier</button> </div> </div> <div> <label>Recherche <input id="player-search"></label> <div id="players-list" class="table"></div> <button id="export-players" class="secondary">Exporter CSV</button> </div> </div> </section> <!-- POOLERS & DRAFT --> <section class="card" id="poolers-section"> <h2>Poolers & Repêchage</h2> <div class="grid-2"> <div> <!-- ADD POOLER (MANAGER ONLY) --> <div data-role="manager-only"> <div class="actions"> <input id="pooler-name" placeholder="Nom du pooler"> <label>Skaters <input id="roster-skaters" type="number" value="15"></label> <label>Gardiens <input id="roster-goalies" type="number" value="2"></label> <button id="add-pooler">Ajouter pooler</button> </div> </div> <!-- LISTE POOLERS VISIBLE POUR TOUS --> <div id="poolers-list" class="table"></div> </div> <div> <h3>Repêchage / Sélection</h3> <!-- Sélection par boîtes (toujours visible) --> <label><input type="checkbox" id="box-mode"> Règles de boîtes B1..B10 / G1 / G2 / BONUS</label> <label>Pooler <select id="draft-pooler"></select></label> <!-- ⚠️ L’ancienne saisie texte peut être masquée via CSS hide-legacy-draft --> <label data-role="manager-only">Joueur <input id="draft-player" list="players-datalist" placeholder="Nom du joueur"> <datalist id="players-datalist"></datalist> </label> <button id="draft-add" data-role="manager-only">Ajouter au roster</button> <!-- NOUVEAU: Sélection par boîtes --> <div id="box-draft" class="box-draft"> <p class="hint">Sélectionne 1 joueur par boîte (BONUS = 5 joueurs), puis clique « Ajouter la sélection ».</p> <div id="box-draft-grid" class="box-draft-grid"></div> <div class="actions"> <button id="box-draft-apply">Ajouter la sélection</button> <button id="box-draft-clear" class="secondary">Effacer</button> </div> </div> <div id="roster-view" class="table"></div> </div> </div> </section> <!-- DONNÉES & STATS — manager-only --> <section class="card" id="data-section" data-role="manager-only"> <h2>Sources & Statistiques</h2> <h3>URL CSV des Stats</h3> <input id="stats-url" placeholder="URL CSV des stats (publié)"> <button id="fetch-stats">Mettre à jour maintenant</button> <label><input type="checkbox" id="auto-refresh"> Rafraîchir toutes les 5 min</label> <div id="last-update" class="muted"></div> <h3>Sources distantes (Poolers & Rosters)</h3> <div class="grid-2"> <label>URL Poolers CSV <input id="poolers-url"> </label> <label>URL Rosters CSV <input id="rosters-url"> </label> </div> <div class="actions"> <button id="save-remote-sources">Sauvegarder les URLs</button> <button id="refresh-remote" class="secondary">Rafraîchir maintenant</button> </div> </section> <!-- LEADERBOARD --> <section class="card" id="leaderboard-section"> <h2>Classement</h2> <div id="leaderboard" class="table"></div> </section> <!-- PLAYER STATISTICS --> <section class="card" id="player-stats-section"> <h2>Statistiques des joueurs</h2> <div class="actions"> <label>Recherche <input id="player-stats-search"></label> <label>Du <input id="stats-from" type="date"></label> <label>Au <input id="stats-to" type="date"></label> <button id="stats-refresh">Appliquer</button> <button id="stats-export" class="secondary">Exporter CSV</button> </div> <div id="player-stats-table" class="table"></div> <dialog id="player-modal"> <h3 id="modal-title">Fiche joueur</h3> <div class="actions"> <label>Du <input id="modal-from" type="date"></label> <label>Au <input id="modal-to" type="date"></label> <button id="modal-apply">Filtrer</button> <button id="modal-close" class="secondary">Fermer</button> </div> <div id="player-daily-table" class="table"></div> </dialog> </section> </main> </body> </html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pool Hockey – Olympiques 2026</title>
+  styles.css
+</head>
+<body class="hide-legacy-draft">
+
+  <!-- ========================================================= -->
+  <!-- 🔐 PORTAIL D’ACCÈS (TOKEN SIGNÉ)                         -->
+  <!-- ========================================================= -->
+  <div id="access-gate" class="gate">
+    <h2>Accès requis</h2>
+    <p>
+      Ce site est protégé. Ouvre l’URL contenant un <strong>token</strong> valide
+      ou colle-le ci‑dessous.
+    </p>
+    <textarea id="paste-token" placeholder="Coller ici le token signé" rows="4"></textarea>
+    <div class="actions">
+      <button id="btn-try-token">Entrer</button>
+    </div>
+    <p id="gate-msg" class="muted"></p>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 🧩 APPLICATION (MASQUÉE SI PAS AUTHENTIFIÉ)               -->
+  <!-- ========================================================= -->
+  <main id="app-root" hidden>
+
+    <!-- SCORING — manager-only -->
+    <section class="card" id="scoring-section" data-role="manager-only">
+      <h2>Paramètres de pointage</h2>
+      <div class="grid-2">
+        <label>Points par but
+          <input id="pts-goal" type="number" value="1" step="0.5">
+        </label>
+        <label>Points par passe
+          <input id="pts-assist" type="number" value="1" step="0.5">
+        </label>
+        <label>Victoire gardien
+          <input id="pts-win" type="number" value="2" step="0.5">
+        </label>
+        <label>Défaite OT/TB gardien
+          <input id="pts-otl" type="number" value="1" step="0.5">
+        </label>
+        <label>Blanchissage
+          <input id="pts-so" type="number" value="3" step="0.5">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="save-scoring">Sauvegarder</button>
+        <button id="reset-scoring" class="secondary">Réinitialiser</button>
+      </div>
+    </section>
+
+    <!-- PLAYERS MASTER — manager-only -->
+    <section class="card" id="players-section" data-role="manager-only">
+      <h2>Joueurs (liste maîtresse)</h2>
+      <div class="grid-2">
+        <div>
+          <div class="actions">
+            <input id="player-name" placeholder="Nom">
+            <select id="player-position">
+              <option value="F">Attaquant</option>
+              <option value="D">Défenseur</option>
+              <option value="G">Gardien</option>
+            </select>
+            <input id="player-team" placeholder="Équipe (CAN)">
+            <button id="add-player">Ajouter</button>
+          </div>
+          <div class="actions">
+            <input id="players-import-url" placeholder="URL CSV Google Sheets (publié)">
+            <button id="import-players-url" class="secondary">Importer URL</button>
+            <input id="players-file" type="file" accept=".csv" hidden>
+            <button id="import-players-file" class="secondary">Importer fichier</button>
+          </div>
+        </div>
+        <div>
+          <label>Recherche
+            <input id="player-search">
+          </label>
+          <div id="players-list" class="table"></div>
+          <button id="export-players" class="secondary">Exporter CSV</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- POOLERS & DRAFT -->
+    <section class="card" id="poolers-section">
+      <h2>Poolers & Repêchage</h2>
+      <div class="grid-2">
+        <div>
+          <!-- ADD POOLER (MANAGER ONLY) -->
+          <div data-role="manager-only">
+            <div class="actions">
+              <input id="pooler-name" placeholder="Nom du pooler">
+              <label>Skaters
+                <input id="roster-skaters" type="number" value="15">
+              </label>
+              <label>Gardiens
+                <input id="roster-goalies" type="number" value="2">
+              </label>
+              <button id="add-pooler">Ajouter pooler</button>
+            </div>
+          </div>
+
+          <!-- LISTE POOLERS (VISIBLE POUR TOUS) -->
+          <div id="poolers-list" class="table"></div>
+        </div>
+
+        <div>
+          <h3>Repêchage / Sélection</h3>
+
+          <!-- Règles boîtes -->
+          <label>
+            <input type="checkbox" id="box-mode">
+            Règles de boîtes B1..B10 / G1 / G2 / BONUS
+          </label>
+
+          <label>Pooler
+            <select id="draft-pooler"></select>
+          </label>
+
+          <!-- Saisie libre (manager-only) -->
+          <label data-role="manager-only">Joueur
+            <input id="draft-player" list="players-datalist" placeholder="Nom du joueur">
+            <datalist id="players-datalist"></datalist>
+          </label>
+          <button id="draft-add" data-role="manager-only">Ajouter au roster</button>
+
+          <!-- Sélection par boîtes (toujours visible) -->
+          <div id="box-draft" class="box-draft">
+            <p class="hint">
+              Sélectionne 1 joueur par boîte (BONUS = 5 joueurs), puis clique « Ajouter la sélection ».
+            </p>
+            <div id="box-draft-grid" class="box-draft-grid"></div>
+            <div class="actions">
+              <button id="box-draft-apply">Ajouter la sélection</button>
+              <button id="box-draft-clear" class="secondary">Effacer</button>
+            </div>
+          </div>
+
+          <div id="roster-view" class="table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DONNÉES & STATS — manager-only -->
+    <section class="card" id="data-section" data-role="manager-only">
+      <h2>Sources & Statistiques</h2>
+
+      <h3>URL CSV des Stats</h3>
+      <input id="stats-url" placeholder="URL CSV des stats (publié)">
+      <div class="actions">
+        <button id="fetch-stats">Mettre à jour maintenant</button>
+        <label>
+          <input type="checkbox" id="auto-refresh">
+          Rafraîchir toutes les 5 min
+        </label>
+      </div>
+      <div id="last-update" class="muted"></div>
+
+      <h3>Sources distantes (Poolers & Rosters)</h3>
+      <div class="grid-2">
+        <label>URL Poolers CSV
+          <input id="poolers-url">
+        </label>
+        <label>URL Rosters CSV
+          <input id="rosters-url">
+        </label>
+      </div>
+      <div class="actions">
+        <button id="save-remote-sources">Sauvegarder les URLs</button>
+        <button id="refresh-remote" class="secondary">Rafraîchir maintenant</button>
+      </div>
+    </section>
+
+    <!-- CLASSEMENT -->
+    <section class="card" id="leaderboard-section">
+      <h2>Classement</h2>
+      <div id="leaderboard" class="table"></div>
+    </section>
+
+    <!-- STATISTIQUES DES JOUEURS -->
+    <section class="card" id="player-stats-section">
+      <h2>Statistiques des joueurs</h2>
+      <div class="actions">
+        <label>Recherche
+          <input id="player-stats-search">
+        </label>
+        <label>Du
+          <input id="stats-from" type="date">
+        </label>
+        <label>Au
+          <input id="stats-to" type="date">
+        </label>
+        <button id="stats-refresh">Appliquer</button>
+        <button id="stats-export" class="secondary">Exporter CSV</button>
+      </div>
+      <div id="player-stats-table" class="table"></div>
+
+      <!-- Modale fiche joueur -->
+      <dialog id="player-modal">
+        <h3 id="modal-title">Fiche joueur</h3>
+        <div class="actions">
+          <label>Du <input id="modal-from" type="date"></label>
+          <label>Au <input id="modal-to" type="date"></label>
+          <button id="modal-apply">Filtrer</button>
+          <button id="modal-close" class="secondary">Fermer</button>
+        </div>
+        <div id="player-daily-table" class="table"></div>
+      </dialog>
+    </section>
+  </main>
+
+  <script>scripts/app.js</script>
+</body>
+</html>
