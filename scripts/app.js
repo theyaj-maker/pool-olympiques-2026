@@ -749,102 +749,47 @@ function init(){
   document.querySelector('#draft-pooler').addEventListener('change', renderRosterView);
 }
 
+// --- INIT AUTH + BOOT APP ---
+// Remplace ton ancien DOMContentLoaded par ce boot.
 async function bootAuthThenApp() {
-  // 1) Auth en premier
-  bindGateUI();
-  await tryTokenFromURL();
-  applyAccessControls();
+  // 1) Auth en premier : on ne démarre rien tant que l'accès n'est pas validé
+  bindGateUI();           // active le bouton "Entrer" (collage manuel d'un token)
+  takeRemoteFromURL();    // option : ?poolers=...&rosters=...&stats=... => mémorise les URLs CSV
+  await tryTokenFromURL(); // option : ?token=... (ou #token=...), vérifie signature/audience/exp/role
+  applyAccessControls();  // montre/masque la gate et les sections [data-role="manager-only"]
 
-  // ❌ Pas authentifié → on n'initialise pas l'app
-  if (document.getElementById('app-root').hidden) return;
+  // 2) Pas authentifié -> on s'arrête ici (l'app reste masquée derrière la gate)
+  const appRoot = document.getElementById('app-root');
+  if (!appRoot || appRoot.hidden) return;
 
-
-  
-// --- au tout début (avant de lancer l’app), récupère les URLs si passées en query ---
-takeRemoteFromURL();
-
-  // 2) ✅ Auth OK → on lance TON app (garde tes appels existants)
-  renderScoring(); bindScoring();
-  renderPlayers(); bindPlayers(); refreshPlayersDatalist();
-  renderPoolers(); bindPoolers(); refreshDraftPooler(); bindDraft();
-  
-renderBoxDraftUI();
-bindBoxDraft();
-
-
-  // (si tu as le checkbox box-mode)
-  const cb = document.querySelector('#box-mode');
-  if (cb) {
-    cb.checked = !!state.boxRulesEnabled;
-    cb.onchange = (e)=>{ state.boxRulesEnabled = e.target.checked; State.save(state); };
-  }
-
-  bindStats(); bindLeagueIO();
+  // 3) Auth OK -> on lance l'application (tes initialisations existantes)
+  renderScoring();            bindScoring();
+  renderPlayers('');          bindPlayers();          refreshPlayersDatalist();
+  renderPoolers();            bindPoolers();          refreshDraftPooler(); bindDraft();
+  renderBoxDraftUI();         bindBoxDraft();
+  bindStats();                bindRemoteSourcesUI();
   computeAndRender();
 
-  
-// --- après avoir construit le DOM et rendu l'app ---
-(function bindRemoteSourcesUI(){
-  const { poolersUrl, rostersUrl, statsUrl } = getRemoteSources();
+  // Changement de pooler -> maj du roster
+  const draftSel = document.getElementById('draft-pooler');
+  if (draftSel) draftSel.addEventListener('change', renderRosterView);
 
-  // Remplir les inputs si présents (manager-only)
-  const elP = document.getElementById('poolers-url');
-  const elR = document.getElementById('rosters-url');
-  if(elP && poolersUrl) elP.value = poolersUrl;
-  if(elR && rostersUrl) elR.value = rostersUrl;
-
-  const btnSave = document.getElementById('save-remote-sources');
-  if(btnSave){
-    btnSave.onclick = ()=>{
-      const src = getRemoteSources();
-      const p = document.getElementById('poolers-url');
-      const r = document.getElementById('rosters-url');
-      if(p) src.poolersUrl = (p.value||'').trim();
-      if(r) src.rostersUrl = (r.value||'').trim();
-      setRemoteSources(src);
-      alert('Sources sauvées.'); 
-    };
-  }
-
-  const btnRef = document.getElementById('refresh-remote');
-  if(btnRef) btnRef.onclick = ()=> refreshAllRemote();
-
-  // Premier chargement commun (si URLs déjà présentes)
-  if(poolersUrl || rostersUrl || statsUrl){
-    refreshAllRemote().catch(console.warn);
-  }
-})();
-
-// --- Auto-refresh : VIEWER = toujours actif; MANAGER = comme avant ---
-(function setupAutoRefreshRoles(){
+  // 4) Auto‑refresh forcé pour les VISITEURS (viewer) toutes les 5 minutes
   const auth = (typeof getAuth === 'function') ? getAuth() : null;
   const role = auth?.role || 'viewer';
 
-  // Masquer le checkbox "auto-refresh" aux viewers (et forcer ON)
-  const autoCb = document.getElementById('auto-refresh');
-  if(role === 'viewer'){
-    if(autoCb){ autoCb.closest('label').style.display = 'none'; } // cache l’option
-    // Forcer un timer global combiné (poolers+rosters+stats)
-    setInterval(()=> refreshAllRemote().catch(console.warn), REFRESH_INTERVAL_MS);
-  } else {
-    // côté manager : on laisse le comportement existant
-    // (ton bindStats() gérait déjà #auto-refresh pour les stats)
-    // On peut en plus lancer un rafraîchissement combiné à intervalle si tu veux :
-    // setInterval(()=> refreshAllRemote().catch(console.warn), REFRESH_INTERVAL_MS);
+  if (role === 'viewer') {
+    // Cache la case "Rafraîchir toutes les 5 min" côté viewer (on force ON)
+    const autoCb = document.getElementById('auto-refresh');
+    if (autoCb && autoCb.closest('label')) {
+      autoCb.closest('label').style.display = 'none';
+    }
+
+    // Rafraîchit Poolers + Rosters + Stats périodiquement
+    setInterval(() => {
+      refreshAllRemote().catch(console.warn);
+    }, REFRESH_INTERVAL_MS);
   }
-})();
-
-  const btnExport = document.getElementById('export-poolers');
-if(btnExport) btnExport.onclick = exportPoolersCSV;
-
-  // (si tu as ajouté la section "Statistiques des joueurs")
-  if (document.getElementById('player-stats-section')) bindPlayerStatsUI();
-
-  const draftSel = document.querySelector('#draft-pooler');
-  if (draftSel) draftSel.addEventListener('change', renderRosterView);
-
-  // (option) bouton déconnexion
-  setupLogoutButton && setupLogoutButton();
 }
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
