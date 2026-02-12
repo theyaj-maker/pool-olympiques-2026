@@ -35,7 +35,28 @@
         <button id="reset-scoring" class="secondary">Réinitialiser</button>
       </div>
     </section>
-
+<section class="card" id="players-section" data-role="manager-only">
+  <h2>Joueurs (liste maîtresse)</h2>
+  <div class="grid-2">
+    <div>
+      <div class="actions">
+        <input id="player-name" placeholder="Nom">
+        <select id="player-position">
+          <option value="F">Attaquant</option>
+          <option value="D">Défenseur</option>
+          <option value="G">Gardien</option>
+        </select>
+        <input id="player-team" placeholder="Équipe (CAN)">
+        <button id="add-player">Ajouter</button>
+      </div>
+    </div>
+    <div>
+      <label>Recherche <input id="player-search"></label>
+      <div id="players-list" class="table"></div>
+      <button id="export-players" class="secondary">Exporter CSV</button>
+    </div>
+  </div>
+</section>
     <!-- POOLERS & DRAFT (extrait) -->
     <section class="card" id="poolers-section">
       <h2>Poolers & Repêchage</h2>
