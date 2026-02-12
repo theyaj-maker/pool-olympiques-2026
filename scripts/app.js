@@ -59,7 +59,14 @@ async function verifyToken(token) {
     const now = new Date();
     if (payload.nbf && now < new Date(payload.nbf)) return { ok:false, msg:'Token non actif (nbf)' };
     if (payload.exp && now > new Date(payload.exp)) return { ok:false, msg:'Token expiré' };
-    if (payload.aud && payload.aud !== location.origin) return { ok:false, msg:'Audience invalide' };
+    if (payload.aud) {
+  const expectedOrigin = location.origin; // ex: https://theyaj-maker.github.io
+  const repoBase = location.pathname.split('/').slice(0,2).join('/'); // ex: /pool-olympiques-2026
+  const expectedWithRepo = expectedOrigin + repoBase;                 // ex: https://theyaj-maker.github.io/pool-olympiques-2026
+  if (payload.aud !== expectedOrigin && payload.aud !== expectedWithRepo) {
+    return { ok:false, msg:'Audience invalide' };
+  }
+}
 
     // rôle
     if (payload.role !== 'viewer' && payload.role !== 'manager') return { ok:false, msg:'Rôle invalide' };
