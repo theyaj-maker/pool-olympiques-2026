@@ -567,7 +567,14 @@ function bindPlayers() {
     const team = ((r[idx.team] || '').toString().trim().toUpperCase());
     const rawBox = (idx.box >= 0 ? (r[idx.box] || '') : '').toString().trim().toUpperCase();
     const box = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(rawBox) ? rawBox : '';
-    state.players.push({ name, position: posN,.target.value);    state.players.push({ name, position: posN, team, box });
+    
+state.players.push({
+  name,
+  position: posN,
+  team,
+  box
+});
+
 
   if (importUrlBtn) {
     importUrlBtn.onclick = async () => {
