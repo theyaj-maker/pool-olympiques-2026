@@ -124,14 +124,20 @@ function clearAuth() {
 // 8) Appliquer l’accès (affiche/masque portail et blocs admin)
 function applyAccessControls() {
   const auth = getAuth();
+  const role = auth?.role || 'viewer';
+
+  // Rôle au niveau du <body> pour permettre un ciblage CSS simple
+  document.body.setAttribute('data-role', role);
+
   const app  = document.getElementById('app-root');
   const gate = document.getElementById('access-gate');
 
   if (auth) { gate.hidden = true;  app.hidden = false; }
   else      { gate.hidden = false; app.hidden = true;  }
 
+  // Blocs manager-only
   document.querySelectorAll('[data-role="manager-only"]').forEach(el => {
-    el.style.display = (auth && auth.role === 'manager') ? '' : 'none';
+    el.style.display = (role === 'manager') ? '' : 'none';
   });
 }
 
@@ -833,15 +839,14 @@ function renderRosterView() {
   const cont = document.getElementById('roster-view');
   if (!cont) return;
 
-  const poolerSelEl = document.getElementById('draft-pooler');
+  const poolerSelEl = document.getElementById('draft-pooler'); // peut être masqué côté viewer
   const poolerName = poolerSelEl ? poolerSelEl.value : null;
   const pl = (state.poolers || []).find(p => p.name === poolerName);
 
   cont.innerHTML = '';
   if (!pl) return;
 
-  const auth = (typeof getAuth === 'function') ? getAuth() : null;
-  const role = auth?.role || 'viewer';
+  const role = (getAuth()?.role) || 'viewer';
   const canEdit = (role === 'manager');
 
   const picked = (pl.players || [])
@@ -851,7 +856,9 @@ function renderRosterView() {
   const table = document.createElement('table');
   table.innerHTML = `
     <thead>
-      <tr><th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th>${canEdit ? '<th></th>' : ''}</tr>
+      <tr>
+        <th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th>${canEdit ? '<th></th>' : ''}
+      </tr>
     </thead>`;
   const tbody = document.createElement('tbody');
 
@@ -865,11 +872,12 @@ function renderRosterView() {
       <td>${p.name}</td>
       <td>${p.position}</td>
       <td>${p.team || ''}</td>
-      <td>${p.box || ''}</td>`;
+      <td>${p.box || ''}</td>
+    `;
     if (canEdit) {
       const td = document.createElement('td');
       const rm = document.createElement('button');
-      rm.className = 'secondary';
+      rm.className = 'secondary only-manager';
       rm.textContent = 'Retirer';
       rm.onclick = () => {
         pl.players = (pl.players || []).filter(n => n !== p.name);
@@ -978,13 +986,23 @@ function renderLeaderboard() {
         <td><strong>${r.points.toFixed(1)}</strong></td>`;
       tbody.appendChild(tr);
     });
+
+    const allZero = totals.every(t => t.points === 0);
+    if (allZero) {
+      const note = document.createElement('tr');
+      note.innerHTML = `
+        <td colspan="3" class="muted">
+          Tous les scores sont à 0. Vérifie que les rosters ne sont pas vides et que l’URL <strong>Stats CSV</strong> est bien publiée/valide.
+        </td>`;
+      tbody.appendChild(note);
+    }
   }
 
   table.appendChild(tbody);
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Bind ouverture modale au clic
+  // Ouvre la vue pooler au clic
   cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
     btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
@@ -1222,21 +1240,15 @@ if (recomputeBtn) {
 
   
 // 4) Auto‑refresh forcé pour VISITEUR (viewer) : toutes les 5 min
-const auth = (typeof getAuth === 'function') ? getAuth() : null;
-const role = auth?.role || 'viewer';
 
-if (role === 'viewer') {
-  // Cache la case côté viewer si elle existe
-  const autoCb = document.getElementById('auto-refresh');
-  if (autoCb && autoCb.closest('label')) {
-    autoCb.closest('label').style.display = 'none';
-  }
+const autoLabel = document.getElementById('auto-refresh')?.closest('label');
+if (autoLabel) autoLabel.style.display = 'none'; // on masque la case, plus d'option manuelle
 
-  // Rafraîchit Poolers + Rosters + Stats périodiquement
-  setInterval(() => {
-    refreshAllRemote().catch(console.warn);
-  }, REFRESH_INTERVAL_MS);
-}
+// Rafraîchit Poolers + Rosters + Stats toutes les 5 min pour TOUS (viewer et manager)
+setInterval(() => {
+  refreshAllRemote().catch(console.warn);
+}, REFRESH_INTERVAL_MS);
+
 
 }
 
