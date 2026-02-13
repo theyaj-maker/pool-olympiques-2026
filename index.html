@@ -16,7 +16,13 @@
     <div class="actions"><button id="btn-try-token">Entrer</button></div>
     <p id="gate-msg" class="muted"></p>
   </div>
+<!-- Badge d’état global (synchro) -->
+<div id="status-badge" class="status-badge" hidden aria-live="polite"></div>
 
+<!-- Barre d’actions globale (bouton refresh client) -->
+<div id="client-toolbar" class="client-toolbar" hidden>
+  <button id="client-refresh" class="btn-ghost small" title="Rafraîchir les données (Players/Poolers/Stats)">Rafraîchir</button>
+</div>
   <!-- ========== Application (masquée tant que non authentifié) ========== -->
   <main id="app-root" hidden>
 
