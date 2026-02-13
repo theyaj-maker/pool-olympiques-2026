@@ -195,32 +195,34 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 // On stocke les URLs dans localStorage (clé dédiée)
 const REMOTE_KEY = 'pool-remote-sources';
 
+
 function getRemoteSources(){
-  try{
-    const raw = localStorage.getItem(REMOTE_KEY);
-    if(raw) return JSON.parse(raw);
-  }catch(_) {}
-  return { poolersUrl:'', rostersUrl:'', statsUrl:'' }; // statsUrl peut rester vide si géré par l'UI existante
+  try { const raw = localStorage.getItem('pool-remote-sources'); if (raw) return JSON.parse(raw); }
+  catch(_) {}
+  return { playersUrl:'', poolersUrl:'', statsUrl:'' };
 }
-
 function setRemoteSources(s){
-  localStorage.setItem(REMOTE_KEY, JSON.stringify(s));
+  localStorage.setItem('pool-remote-sources', JSON.stringify(s));
 }
 
-// Option "bootstrap par URL" : ?poolers=...&rosters=...&stats=...
 function takeRemoteFromURL(){
-  // 1) Certains liens collent des &amp; -> remplace par de vrais &
+  // Convertit &amp; -> & avant parsing (liens collés depuis HTML)
   const raw = location.href.replaceAll('&amp;', '&');
   const u = new URL(raw);
-
   const src = getRemoteSources();
   let changed = false;
-  for (const k of ['poolers','rosters','stats']) {
-    const v = u.searchParams.get(k);
-    if (v) { src[k + 'Url'] = v; changed = true; }
-  }
+
+  const P = u.searchParams.get('players');
+  const L = u.searchParams.get('poolers');
+  const S = u.searchParams.get('stats');
+
+  if (P && src.playersUrl !== P) { src.playersUrl = P; changed = true; }
+  if (L && src.poolersUrl !== L) { src.poolersUrl = L; changed = true; }
+  if (S && src.statsUrl   !== S) { src.statsUrl   = S; changed = true; }
+
   if (changed) setRemoteSources(src);
 }
+
 
 
 async function fetchTextNoCache(url){
@@ -230,62 +232,113 @@ async function fetchTextNoCache(url){
   return await r.text();
 }
 
+async function loadPlayersFromCSV(url){
+  if (!url) return;
+  const txt = await fetch(url, { cache:'no-store' }).then(r=>r.text());
+  const rows = CSV.parse(txt);
+  if (!rows.length) throw new Error('Joueurs CSV vide');
+
+  const norm = s => String(s||'').toLowerCase().trim().replace(/\s+|_/g,'');
+  const headerRaw = rows.shift();
+  const header = headerRaw.map(norm);
+  const find = (...alts) => { for (const a of alts){ const i=header.indexOf(a); if(i>=0) return i; } return -1; };
+
+  const idx = {
+    name:     find('name','nom','player','joueur'),
+    position: find('position','pos'),
+    team:     find('team','equipe','country','nation'),
+    box:      find('box','boite','case')
+  };
+  if (idx.name < 0) {
+    console.warn('[Joueurs] En-têtes reçus =', headerRaw, '→ normalisés =', header);
+    throw new Error('Joueurs CSV: colonne "name" (ou alias) introuvable');
+  }
+
+  // Construit la liste maîtresse (remplace entièrement)
+  const players = [];
+  rows.forEach(r=>{
+    const name = (r[idx.name]||'').toString().trim();
+    if (!name) return;
+    const posRaw = (idx.position>=0 ? (r[idx.position]||'') : '').toString().trim().toUpperCase();
+    const position = posRaw.startsWith('G') ? 'G' : (posRaw.startsWith('D') ? 'D' : (posRaw ? 'F' : 'F'));
+    const team = (idx.team>=0 ? (r[idx.team]||'') : '').toString().trim().toUpperCase();
+    const bxRaw = (idx.box >=0 ? (r[idx.box] ||'') : '').toString().trim().toUpperCase();
+    const box = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(bxRaw) ? bxRaw : '';
+    players.push({ name, position, team, box });
+  });
+
+  state.players = players;
+  State.save(state);
+  refreshPlayersDatalist?.();   // si présent
+  renderPlayers?.('');          // si UI Joueurs visible
+}
+
 // Rosters CSV: pooler,player[,position,team,box] — position/team/box facultatifs
 async function loadRostersFromCSV(url){
   if (!url) return;
-  const text = await fetchTextNoCache(url);
-  const rows = CSV.parse(text);
-  if (!rows.length) throw new Error('Rosters CSV vide');
+  const txt = await fetch(url, { cache:'no-store' }).then(r=>r.text());
+  const rows = CSV.parse(txt);
+  if (!rows.length) throw new Error('Poolers CSV vide');
 
-  const header = rows.shift().map(h => h.toLowerCase().trim());
+  const norm = s => String(s||'').toLowerCase().trim().replace(/\s+|_/g,'');
+  const headerRaw = rows.shift();
+  const header = headerRaw.map(norm);
+  const find = (...alts) => { for (const a of alts){ const i=header.indexOf(a); if(i>=0) return i; } return -1; };
+
   const idx = {
-    pooler:   header.indexOf('pooler'),
-    player:   header.indexOf('player'),
-    position: header.indexOf('position'),
-    team:     header.indexOf('team'),
-    box:      header.indexOf('box')
+    pooler:   find('pooler','equipe','owner','nom'),
+    player:   find('player','joueur','name'),
+    position: find('position','pos'),
+    team:     find('team','equipe','country','nation'),
+    box:      find('box','boite','case')
   };
-  if (idx.pooler < 0 || idx.player < 0) {
-    throw new Error('Rosters CSV: en-têtes requis = pooler,player');
+  if (idx.pooler<0 || idx.player<0) {
+    console.warn('[Poolers] En-têtes reçus =', headerRaw, '→ normalisés =', header);
+    throw new Error('Poolers CSV: colonnes requises (pooler,player) introuvables');
   }
 
-  // Table par nom de pooler (lowercased)
-  const map = Object.create(null);
-  (state.poolers || []).forEach(p => map[p.name.toLowerCase()] = p);
+  // Indexe la liste maîtresse pour enrichissement rapide
+  const master = new Map((state.players||[]).map(p => [p.name.toLowerCase(), p]));
 
-  // Reset du roster (on suit le CSV rosters comme vérité)
-  Object.values(map).forEach(p => p.players = []);
+  // Construit la map pooler -> roster (reset rosters d’après CSV)
+  const map = new Map(); // poolerName -> {name, roster:{skaters,goalies}, players:[]}
+  rows.forEach(r=>{
+    const poolerName = (r[idx.pooler]||'').toString().trim();
+    const playerName = (r[idx.player]||'').toString().trim();
+    if (!poolerName) return;
 
-  rows.forEach(r => {
-    const poolerName = (r[idx.pooler] || '').toString().trim();
-    const playerName = (r[idx.player] || '').toString().trim();
-    if (!poolerName || !playerName) return;
-
-    const pl = map[poolerName.toLowerCase()];
-    if (!pl) return; // le pooler doit exister
-
-    // Si position/team/box fournis -> enrichit la liste maîtresse
-    if (idx.position >= 0 || idx.team >= 0 || idx.box >= 0) {
-      const posRaw = ((idx.position>=0 ? (r[idx.position]||'') : '')).toString().trim().toUpperCase();
-      const posN   = posRaw.startsWith('G') ? 'G' : (posRaw.startsWith('D') ? 'D' : 'F');
-      const team   = ((idx.team>=0 ? (r[idx.team]||'') : '')).toString().trim().toUpperCase();
-      const bxRaw  = ((idx.box>=0 ? (r[idx.box]||'')  : '')).toString().trim().toUpperCase();
-      const box    = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(bxRaw) ? bxRaw : '';
-
-      const exist = state.players.find(x => x.name.toLowerCase() === playerName.toLowerCase());
-      if (!exist) state.players.push({ name: playerName, position: posN, team, box });
+    if (!map.has(poolerName)) {
+      map.set(poolerName, { name: poolerName, roster:{ skaters:15, goalies:2 }, players: [] });
     }
+    if (!playerName) return;
 
+    // Ajoute au roster
+    const pl = map.get(poolerName);
     if (!pl.players.includes(playerName)) pl.players.push(playerName);
+
+    // Enrichit la liste maîtresse si info fournie
+    const posRaw = (idx.position>=0 ? (r[idx.position]||'') : '').toString().trim().toUpperCase();
+    const position = posRaw.startsWith('G') ? 'G' : (posRaw.startsWith('D') ? 'D' : (posRaw ? 'F' : ''));
+    const team = (idx.team>=0 ? (r[idx.team]||'') : '').toString().trim().toUpperCase();
+    const bxRaw = (idx.box >=0 ? (r[idx.box] ||'') : '').toString().trim().toUpperCase();
+    const box = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(bxRaw) ? bxRaw : '';
+
+    const ex = master.get(playerName.toLowerCase());
+    if (!ex) {
+      const np = { name: playerName, position: position || 'F', team, box };
+      state.players.push(np);
+      master.set(playerName.toLowerCase(), np);
+    } else {
+      if (!ex.position && position) ex.position = position;
+      if (!ex.team && team) ex.team = team;
+      if (!ex.box && box) ex.box = box;
+    }
   });
 
+  state.poolers = Array.from(map.values());
   State.save(state);
-  renderPoolers();
-  renderRosterView();
-  refreshPlayersDatalist();
-  computeAndRender();
+  renderPoolers?.(); refreshDraftPooler?.(); renderRosterView?.(); computeAndRender?.();
 }
-
 // Poolers CSV attendu : pooler,skaters,goalies
 async function loadPoolersFromCSV(url){
   if (!url) return;
@@ -327,32 +380,32 @@ async function loadPoolersFromCSV(url){
 async function refreshAllRemote(){
   const src = getRemoteSources();
 
-  // 1) Poolers
+  // 1) Joueurs (liste maîtresse) — facultatif mais recommandé
+  if (src.playersUrl) {
+    try { await loadPlayersFromCSV(src.playersUrl); }
+    catch(e){ console.warn('Joueurs CSV:', e.message||e); }
+  }
+
+  // 2) Poolers + rosters
   if (src.poolersUrl) {
-    try { await loadPoolersFromCSV(src.poolersUrl); }
+    try { await loadRostersFromCSV(src.poolersUrl); }
     catch(e){ console.warn('Poolers CSV:', e.message||e); }
   }
 
-  // 2) Rosters
-  if (src.rostersUrl) {
-    try { await loadRostersFromCSV(src.rostersUrl); }
-    catch(e){ console.warn('Rosters CSV:', e.message||e); }
-  }
-
   // 3) Stats
-  const elS = document.getElementById('stats-url'); // champ manager si présent
+  const elS = document.getElementById('stats-url');
   const statsUrl = (elS && elS.value) ? elS.value.trim() : (src.statsUrl || '');
   if (statsUrl) {
     try {
-      const txt = await fetch(statsUrl, { cache:'no-store' }).then(r => r.text());
+      const txt = await fetch(statsUrl, { cache:'no-store' }).then(r=>r.text());
       await ingestStatsFromCSVText(txt);
     } catch(e){
       console.warn('Stats CSV:', e.message||e);
     }
   }
 
-  // 4) Rendu
-  computeAndRender();
+  // 4) Rendu final
+  computeAndRender?.();
 }
 
 // 🔓 expose pour tests console (modules ES ne mettent pas les fonctions en global)
@@ -363,38 +416,36 @@ window.refreshAllRemote = refreshAllRemote;
 //  Fonction demandée : bindRemoteSourcesUI()
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 function bindRemoteSourcesUI(){
-  const { poolersUrl, rostersUrl, statsUrl } = getRemoteSources();
+  const src = getRemoteSources();
 
-  // Remplir les inputs (si présents dans l’UI manager-only)
-  const elP = document.getElementById('poolers-url');
-  const elR = document.getElementById('rosters-url');
-  if (elP && poolersUrl) elP.value = poolersUrl;
-  if (elR && rostersUrl) elR.value = rostersUrl;
+  const elPlayers = document.getElementById('players-url');
+  const elPoolers = document.getElementById('poolers-url');
+  const elStats   = document.getElementById('stats-url');
 
-  // Sauvegarder
+  if (elPlayers && src.playersUrl) elPlayers.value = src.playersUrl;
+  if (elPoolers && src.poolersUrl) elPoolers.value = src.poolersUrl;
+  if (elStats   && src.statsUrl)   elStats.value   = src.statsUrl;
+
   const btnSave = document.getElementById('save-remote-sources');
   if (btnSave) {
     btnSave.onclick = () => {
-      const src = getRemoteSources();
-      const p = document.getElementById('poolers-url');
-      const r = document.getElementById('rosters-url');
-      if (p) src.poolersUrl = (p.value || '').trim();
-      if (r) src.rostersUrl = (r.value || '').trim();
-      setRemoteSources(src);
-      alert('Sources sauvegardées.');
+      const cur = getRemoteSources();
+      if (elPlayers) cur.playersUrl = (elPlayers.value || '').trim();
+      if (elPoolers) cur.poolersUrl = (elPoolers.value || '').trim();
+      if (elStats)   cur.statsUrl   = (elStats.value   || '').trim();
+      setRemoteSources(cur);
+      alert('Sources sauvées.');
     };
   }
 
-  // Rafraîchir maintenant (Poolers+Rosters+Stats)
   const btnRef = document.getElementById('refresh-remote');
   if (btnRef) btnRef.onclick = () => refreshAllRemote();
 
-  // Premier chargement auto si on a déjà des URLs mémorisées
-  if (poolersUrl || rostersUrl || statsUrl) {
+  // Si on a déjà des URLs mémorisées, charger automatiquement
+  if (src.playersUrl || src.poolersUrl || src.statsUrl) {
     refreshAllRemote().catch(console.warn);
   }
 }
-
 /***** =======================================================
  *  SÉLECTION PAR BOÎTES (B1..B10, G1, G2, BONUS x5)
  *========================================================= ***/
