@@ -206,20 +206,29 @@ function setStatusErr(msg='Erreur de synchronisation'){
   setStatus('err', msg);
 }
 
-function countMatches(playerName, fromStr, toStr){
+// ---------- Helpers numériques sûrs ----------
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+function safeFixed(v, d = 1) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(d) : (0).toFixed(d);
+}
+
+// ---------- Compte les "matchs joués" (1 ligne de stats = 1 match) ----------
+function countMatches(playerName, fromStr, toStr) {
   const days = state.stats?.[playerName] || {};
   const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
-
-  // "Au" = aujourd'hui si vide
-  const toStrEff = toStr || new Date().toISOString().slice(0,10);
-  const to = new Date(toStrEff + 'T23:59:59');
+  const toEff = toStr || new Date().toISOString().slice(0, 10); // "aujourd'hui" si vide
+  const to = new Date(toEff + 'T23:59:59');
 
   let mj = 0;
   Object.keys(days).forEach(d => {
     const dt = new Date(d + 'T12:00:00');
     if (from && dt < from) return;
-    if (to   && dt > to)   return;
-    mj += 1; // 1 entrée de stats = 1 match joué
+    if (to && dt > to) return;
+    mj += 1;
   });
   return mj;
 }
@@ -1220,25 +1229,44 @@ function aggregatePoolerStats(poolerName, fromStr, toStr) {
 
   const roster = pooler.players || [];
   const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
-  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+  const toEff = toStr || new Date().toISOString().slice(0, 10);
+  const to = new Date(toEff + 'T23:59:59');
 
-  const s = state.scoring;
-  const rows = roster.map(name => {
-    const days = state.stats[name] || {};
-    let g=0,a=0,win=0,otl=0,so=0,pts=0;
-    Object.entries(days).forEach(([d,v]) => {
+  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  const rows = [];
+
+  roster.forEach(name => {
+    const days = state.stats?.[name] || {};
+    let g = 0, a = 0, win = 0, otl = 0, so = 0, pts = 0;
+
+    Object.entries(days).forEach(([d, v]) => {
       const dt = new Date(d + 'T12:00:00');
       if (from && dt < from) return;
-      if (to   && dt > to)   return;
-      g += v.goals||0; a += v.assists||0; win += v.win||0; otl += v.otl||0; so += v.so||0;
-      pts += (v.goals||0)*s.goal + (v.assists||0)*s.assist +
-             (v.win||0)*s.goalie_win + (v.otl||0)*s.goalie_otl + (v.so||0)*s.shutout;
+      if (to && dt > to) return;
+
+      const G = safeNum(v.goals), A = safeNum(v.assists);
+      const W = safeNum(v.win),   O = safeNum(v.otl),    S = safeNum(v.so);
+
+      g += G; a += A; win += W; otl += O; so += S;
+      pts += G*s.goal + A*s.assist + W*s.goalie_win + O*s.goalie_otl + S*s.shutout;
     });
-    const meta = state.players.find(p => p.name === name) || {};
-    return { name, position: meta.position||'', team: meta.team||'', box: meta.box||'', g,a,win,otl,so,pts };
+
+    // métadonnées du joueur (position/team) — valeurs par défaut si absent
+    const meta = (state.players || []).find(p => p.name === name) || {};
+    rows.push({
+      name,
+      position: meta.position || '',
+      team: meta.team || '',
+      goals: safeNum(g),
+      assists: safeNum(a),
+      win: safeNum(win),
+      otl: safeNum(otl),
+      so: safeNum(so),
+      points: safeNum(pts)
+    });
   });
 
-  rows.sort((a,b) => b.pts - a.pts || a.name.localeCompare(b.name));
+  rows.sort((x, y) => y.points - x.points || x.name.localeCompare(y.name));
   return rows;
 }
 
@@ -1246,18 +1274,23 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   const cont = document.getElementById('pooler-players-table');
   if (!cont) return;
 
-  // Désactiver le zébrage dans le modal
+  // zébrage OFF dans ce bloc
   cont.classList.add('no-zebra');
 
-  // rows issus de aggregatePoolerStats(poolerName, from, to)
-  const rows = aggregatePoolerStats(poolerName, fromStr, toStr)
-    .map(r => ({
+  let rows = [];
+  try {
+    rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || []).map(r => ({
       ...r,
       mj: countMatches(r.name, fromStr, toStr)
     }));
+  } catch (e) {
+    console.warn('aggregatePoolerStats error:', e);
+    rows = [];
+  }
 
   const table = document.createElement('table');
   table.classList.add('table');
+
   table.innerHTML = `
     <thead>
       <tr>
@@ -1267,40 +1300,59 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
         <th>Points</th><th>Détail</th>
       </tr>
     </thead>`;
+
   const tbody = document.createElement('tbody');
 
-  rows.forEach(r => {
+  if (!rows.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${r.name}</td>
-      <td>${r.position}</td>
-      <td>${r.team}</td>
-      <td>${r.mj}</td>
-      <td>${r.goals}</td>
-      <td>${r.assists}</td>
-      <td>${r.win}</td>
-      <td>${r.otl}</td>
-      <td>${r.so}</td>
-      <td><strong>${r.points.toFixed(1)}</strong></td>
-      <td><button class="secondary" data-open-player="${r.name}">Voir</button></td>`;
+    tr.innerHTML = `<td colspan="11"><em>Aucune donnée pour cette période.</em></td>`;
     tbody.appendChild(tr);
-  });
+  } else {
+    rows.forEach(r => {
+      // garde‑fous si jamais r est mal formé
+      const name = r?.name || '';
+      const pos  = r?.position || '';
+      const team = r?.team || '';
+      const mj   = safeNum(r?.mj);
+      const g    = safeNum(r?.goals);
+      const a    = safeNum(r?.assists);
+      const w    = safeNum(r?.win);
+      const o    = safeNum(r?.otl);
+      const s    = safeNum(r?.so);
+      const pts  = safeNum(r?.points);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${name}</td>
+        <td>${pos}</td>
+        <td>${team}</td>
+        <td>${mj}</td>
+        <td>${g}</td>
+        <td>${a}</td>
+        <td>${w}</td>
+        <td>${o}</td>
+        <td>${s}</td>
+        <td><strong>${safeFixed(pts, 1)}</strong></td>
+        <td><button class="secondary" data-open-player="${name}">Voir</button></td>`;
+      tbody.appendChild(tr);
+    });
+  }
 
   table.appendChild(tbody);
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Ouvre le détail quotidien
+  // Bind "Voir" -> table quotidienne
   cont.querySelectorAll('[data-open-player]').forEach(btn => {
     btn.onclick = () => {
       const name = btn.getAttribute('data-open-player');
-      const from = document.getElementById('pooler-from').value || '';
-      const to   = document.getElementById('pooler-to').value   || '';
+      const from = document.getElementById('pooler-from')?.value || '';
+      const to   = document.getElementById('pooler-to')?.value   || '';
       renderPoolerDailyTable(poolerName, name, from, to);
     };
   });
 
-  // Nettoie la table quotidienne tant qu’aucun joueur n’est sélectionné
+  // Réinitialise la zone quotidienne si aucun joueur sélectionné
   const titleDaily = document.getElementById('pooler-daily-title');
   const daily = document.getElementById('pooler-daily-table');
   if (titleDaily) titleDaily.style.display = 'none';
