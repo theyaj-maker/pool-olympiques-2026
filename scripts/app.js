@@ -243,6 +243,10 @@ function safeFixed(v, d = 1) {
   return Number.isFinite(n) ? n.toFixed(d) : (0).toFixed(d);
 }
 
+function isMobile() {
+  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+}
+
 // ---------- Compte les "matchs joués" (1 ligne de stats = 1 match) ----------
 function countMatches(playerName, fromStr, toStr){
   const days = state.stats?.[playerName] || {};
@@ -1383,8 +1387,8 @@ function renderLeaderboard() {
   cont.appendChild(table);
 
   
-// ajuste les entêtes si petit écran
-compactLeaderboardHeadersIfSmall();
+renderLeaderboardCardsMobile(); // cartes mobile
+
 
 
   // Click pour ouvrir la modale "Vue pooler"
@@ -1410,6 +1414,47 @@ function compactLeaderboardHeadersIfSmall(){
     ths[3].textContent = 'Points hier';
     ths[4].textContent = 'Points aujourd’hui';
   }
+}
+
+function renderLeaderboardCardsMobile() {
+  const host = document.getElementById('leaderboard-cards');
+  if (!host) return;
+  host.innerHTML = '';
+
+  if (!isMobile()) { host.style.display = 'none'; return; }
+  host.style.display = 'grid';
+
+  let totals = [];
+  try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
+
+  if (!totals.length) {
+    host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
+    return;
+  }
+
+  totals.forEach((r, i) => {
+    const card = document.createElement('div');
+    card.className = 'lb-card';
+    card.innerHTML = `
+      <div class="lb-head">
+        <div class="lb-rank">${i+1}</div>
+        <div class="lb-name">
+          <button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button>
+        </div>
+        <div class="lb-total">🥇 ${Number(r.points||0).toFixed(1)}</div>
+      </div>
+      <div class="lb-sub">
+        <div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;${Number(r.today||0).toFixed(1)}</div>
+        <div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;${Number(r.yest||0).toFixed(1)}</div>
+      </div>
+    `;
+    host.appendChild(card);
+  });
+
+  // Clic sur le nom => modale
+  host.querySelectorAll('[data-open-pooler]').forEach(btn => {
+    btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
+  });
 }
 
 // =====================================================
@@ -1552,6 +1597,7 @@ function aggregatePoolerStats(poolerName, fromStr, toStr) {
   rows.sort((x, y) => y.points - x.points || x.name.localeCompare(y.name));
   return rows;
 }
+
 
 function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   const cont = document.getElementById('pooler-players-table');
@@ -1763,6 +1809,117 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
   cont.innerHTML = '';
   cont.appendChild(table);
 }
+
+function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
+  const host = document.getElementById('pooler-players-cards');
+  if (!host) return;
+  host.innerHTML = '';
+
+  if (!isMobile()) { host.style.display = 'none'; return; }
+  host.style.display = 'grid';
+
+  const rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || [])
+    .map(r => Object.assign({}, r, { mj: countMatches(r.name, fromStr, toStr) }));
+
+  if (!rows.length) {
+    host.innerHTML = '<div class="pl-card"><em>Aucun joueur dans la période.</em></div>';
+    return;
+  }
+
+  rows.forEach(r => {
+    const c = document.createElement('div');
+    c.className = 'pl-card';
+    c.innerHTML = `
+      <div class="pl-head">
+        <div class="pl-name">${r.name}</div>
+        <div class="pl-meta">${r.position || ''} ${r.team ? '· '+r.team : ''}</div>
+      </div>
+      <div class="pl-stats">
+        <div class="stat"><span class="v">${r.mj||0}</span>MJ</div>
+        <div class="stat"><span class="v">${r.goals||0}</span>Buts</div>
+        <div class="stat"><span class="v">${r.assists||0}</span>Passes</div>
+        <div class="stat"><span class="v">${r.win||0}</span>Win</div>
+        <div class="stat"><span class="v">${r.otl||0}</span>OTL</div>
+        <div class="stat"><span class="v">${r.so||0}</span>SO</div>
+        <div class="stat" style="grid-column: span 3;"><span class="v">${Number(r.points||0).toFixed(1)}</span>Points</div>
+      </div>
+      <div class="actions" style="margin-top:8px;">
+        <button class="secondary" data-open-player="${r.name}">Voir le détail</button>
+      </div>
+    `;
+    host.appendChild(c);
+  });
+
+  host.querySelectorAll('[data-open-player]').forEach(btn => {
+    btn.onclick = () => {
+      const name = btn.getAttribute('data-open-player');
+      const from = document.getElementById('pooler-from')?.value || '';
+      const to   = document.getElementById('pooler-to')?.value   || '';
+      renderPoolerDailyCards(poolerName, name, from, to);
+    };
+  });
+}
+
+function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
+  const host = document.getElementById('pooler-daily-cards');
+  const title = document.getElementById('pooler-daily-title');
+  if (!host || !title) return;
+
+  host.innerHTML = '';
+
+  if (!isMobile()) { host.style.display = 'none'; return; }
+  host.style.display = 'grid';
+
+  title.textContent = 'Détail par date — ' + playerName;
+  title.style.display = '';
+
+  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  const days = (state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  const toEff = toStr || new Date().toISOString().slice(0,10);
+  const to = new Date(toEff + 'T23:59:59');
+
+  const list = Object.keys(days)
+    .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .filter(d => {
+      const dt = new Date(d + 'T12:00:00');
+      if (from && dt < from) return false;
+      if (to   && dt > to)   return false;
+      return true;
+    })
+    .sort()
+    .map(d => {
+      const v = days[d] || {};
+      const gg = Number(v.goals||0), aa = Number(v.assists||0),
+            ww = Number(v.win||0),   oo = Number(v.otl||0), ss = Number(v.so||0);
+      const pts = gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*(s.goalie_otl||0) + ss*s.shutout;
+      const mj  = v.hasOwnProperty('played') ? Number(v.played||0) : 1;
+      return { date:d, mj, goals:gg, assists:aa, win:ww, otl:oo, so:ss, points:pts };
+    });
+
+  if (!list.length) {
+    host.innerHTML = '<div class="day-card"><em>Aucune donnée dans la période.</em></div>';
+    return;
+  }
+
+  list.forEach(r => {
+    const c = document.createElement('div');
+    c.className = 'day-card';
+    c.innerHTML = `
+      <div class="day-head"><div>${r.date}</div><div><strong>${r.points.toFixed(1)}</strong> pts</div></div>
+      <div class="day-stats">
+        <div class="stat"><span class="v">${r.mj}</span>MJ</div>
+        <div class="stat"><span class="v">${r.goals}</span>Buts</div>
+        <div class="stat"><span class="v">${r.assists}</span>Passes</div>
+        <div class="stat"><span class="v">${r.win}</span>Win</div>
+        <div class="stat"><span class="v">${r.otl}</span>OTL</div>
+        <div class="stat"><span class="v">${r.so}</span>SO</div>
+      </div>
+    `;
+    host.appendChild(c);
+  });
+}
+
 function openDialogSafe(dlg){
   if (!dlg) return;
   if (typeof dlg.showModal === 'function') dlg.showModal();
@@ -1777,14 +1934,14 @@ function openPoolerModal(poolerName) {
   const dlg = document.getElementById('pooler-modal');
   if (!dlg) return;
 
-  // Collecte des dates présentes pour ce pooler
+  // bornes de date (comme tu l’avais)
   const roster = (state.poolers || []).find(p => p.name === poolerName)?.players || [];
-  const dateSet = new Set();
-  roster.forEach(function (n) { Object.keys(state.stats?.[n] || {}).forEach(function (d) { dateSet.add(d); }); });
-  const arr = Array.from(dateSet).sort();
+  const set = new Set();
+  roster.forEach(n => Object.keys(state.stats?.[n] || {}).forEach(d => set.add(d)));
+  const arr = Array.from(set).sort();
   const minD = arr[0] || '';
   const today = new Date().toISOString().slice(0,10);
-  const maxD = arr[arr.length - 1] || today;
+  const maxD = arr[arr.length-1] || today;
 
   document.getElementById('pooler-modal-title').textContent = 'Vue — ' + poolerName;
   const fromEl = document.getElementById('pooler-from');
@@ -1792,20 +1949,38 @@ function openPoolerModal(poolerName) {
   if (fromEl) fromEl.value = minD;
   if (toEl)   toEl.value   = maxD;
 
-  renderPoolerPlayersTable(poolerName, minD, maxD);
+  // Rendu agrégé (table desktop existante)
+  renderPoolerPlayersTable?.(poolerName, minD, maxD);
+  // Nouveau : cartes mobile
+  renderPoolerPlayersCards(poolerName, minD, maxD);
 
-  const btnApply = document.getElementById('pooler-apply');
-  const btnClose = document.getElementById('pooler-close');
-  if (btnApply) {
-    btnApply.onclick = function () {
+  // reset du quotidien
+  const titleDaily = document.getElementById('pooler-daily-title');
+  const dailyTbl = document.getElementById('pooler-daily-table');
+  const dailyCards = document.getElementById('pooler-daily-cards');
+  if (titleDaily) titleDaily.style.display = 'none';
+  if (dailyTbl) dailyTbl.innerHTML = '';
+  if (dailyCards) dailyCards.innerHTML = '';
+
+  // Filtre
+  const applyBtn = document.getElementById('pooler-apply');
+  if (applyBtn) {
+    applyBtn.onclick = () => {
       const f = fromEl?.value || '';
       const t = toEl?.value   || today;
-      renderPoolerPlayersTable(poolerName, f, t);
+      renderPoolerPlayersTable?.(poolerName, f, t);
+      renderPoolerPlayersCards(poolerName, f, t);
+      // détail quotidien vidé tant que pas “Voir”
+      if (titleDaily) titleDaily.style.display = 'none';
+      if (dailyTbl) dailyTbl.innerHTML = '';
+      if (dailyCards) dailyCards.innerHTML = '';
     };
   }
-  if (btnClose) btnClose.onclick = function () { closeDialogSafe(dlg); };
 
-  openDialogSafe(dlg);
+  const closeBtn = document.getElementById('pooler-close');
+  if (closeBtn) closeBtn.onclick = () => closeDialogSafe?.(dlg);
+
+  openDialogSafe?.(dlg) || dlg.showModal?.();
 }
 
 function placeLeaderboardFirstOnMobile(){
@@ -1858,6 +2033,7 @@ if (document.getElementById('players-list')) {
   bindStats();                bindRemoteSourcesUI();
   computeAndRender();
   renderPoolersCardsMobile();
+  renderLeaderboardCardsMobile();
 
   const recomputeBtn = document.getElementById('recompute');
 if (recomputeBtn) {
@@ -1907,8 +2083,9 @@ if (clientRefreshBtn) {
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
 window.addEventListener('resize', placeLeaderboardFirstOnMobile, { passive: true });
-window.addEventListener('resize', compactLeaderboardHeadersIfSmall, { passive: true });
+window.addEventListener('resize', renderLeaderboardCardsMobile, { passive: true });
 placeLeaderboardFirstOnMobile();
+
 
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') {
