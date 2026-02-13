@@ -328,14 +328,28 @@ async function refreshAllRemote(){
   const src = getRemoteSources();
   const ops = [];
 
+  const fetchCSV = async (url, onText) => {
+    const r = await fetch(url, { cache: 'no-store' });
+    const txt = await r.text();
+    // Détection très simple du HTML
+    if (/^\s*</.test(txt) && /<html|<head|<body/i.test(txt)) {
+      console.warn('[CSV] HTML reçu au lieu de CSV →', url);
+      const banner = document.getElementById('last-update');
+      if (banner) banner.textContent = '⚠️ La source ne renvoie pas du CSV (vérifie la publication Google Sheets).';
+      return;
+    }
+    await onText(txt);
+  };
+
   if (src.poolersUrl) ops.push(loadPoolersFromCSV(src.poolersUrl).catch(e => console.warn('Poolers CSV:', e.message||e)));
   if (src.rostersUrl) ops.push(loadRostersFromCSV(src.rostersUrl).catch(e => console.warn('Rosters CSV:', e.message||e)));
 
-  // Stats : depuis l’input si présent, sinon depuis la source mémorisée
+  // Stats: input UI si présent, sinon source mémorisée
   const statsEl = document.getElementById('stats-url');
   const statsUrl = (statsEl && statsEl.value) ? statsEl.value.trim() : (src.statsUrl || '');
+
   if (statsUrl) {
-    ops.push(fetchTextNoCache(statsUrl).then(ingestStatsFromCSVText).catch(e => console.warn('Stats CSV:', e.message||e)));
+    ops.push(fetchCSV(statsUrl, ingestStatsFromCSVText).catch(e => console.warn('Stats CSV:', e.message||e)));
   }
 
   await Promise.all(ops);
