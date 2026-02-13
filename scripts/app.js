@@ -193,17 +193,35 @@ function setStatus(level='ok', text=''){
   badge.hidden = false;
   badge.classList.remove('ok','warn','err');
   badge.classList.add(level);
-  badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text}</span>`;
+  badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text || ' '}</span>`;
 }
-function setStatusOK(summary){
+function setStatusOK(summary='Synchro OK'){
   const ts = new Date().toLocaleTimeString();
-  setStatus('ok', `Synchro OK — ${summary} · ${ts}`);
+  setStatus('ok', `${summary} · ${ts}`);
 }
 function setStatusWarn(msg='Synchronisation en cours…'){
   setStatus('warn', msg);
 }
 function setStatusErr(msg='Erreur de synchronisation'){
   setStatus('err', msg);
+}
+
+function countMatches(playerName, fromStr, toStr){
+  const days = state.stats?.[playerName] || {};
+  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+
+  // "Au" = aujourd'hui si vide
+  const toStrEff = toStr || new Date().toISOString().slice(0,10);
+  const to = new Date(toStrEff + 'T23:59:59');
+
+  let mj = 0;
+  Object.keys(days).forEach(d => {
+    const dt = new Date(d + 'T12:00:00');
+    if (from && dt < from) return;
+    if (to   && dt > to)   return;
+    mj += 1; // 1 entrée de stats = 1 match joué
+  });
+  return mj;
 }
 
 /***** =========================================
@@ -1228,13 +1246,25 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   const cont = document.getElementById('pooler-players-table');
   if (!cont) return;
 
-  const rows = aggregatePoolerStats(poolerName, fromStr, toStr);
+  // Désactiver le zébrage dans le modal
+  cont.classList.add('no-zebra');
+
+  // rows issus de aggregatePoolerStats(poolerName, from, to)
+  const rows = aggregatePoolerStats(poolerName, fromStr, toStr)
+    .map(r => ({
+      ...r,
+      mj: countMatches(r.name, fromStr, toStr)
+    }));
+
   const table = document.createElement('table');
+  table.classList.add('table');
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Joueur</th><th>Pos</th><th>Équipe</th><th>Boîte</th>
-        <th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th><th>Détail</th>
+        <th>Joueur</th><th>Pos</th><th>Équipe</th>
+        <th>MJ</th>
+        <th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th>
+        <th>Points</th><th>Détail</th>
       </tr>
     </thead>`;
   const tbody = document.createElement('tbody');
@@ -1242,9 +1272,16 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   rows.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.name}</td><td>${r.position}</td><td>${r.team}</td><td>${r.box||''}</td>
-      <td>${r.g}</td><td>${r.a}</td><td>${r.win}</td><td>${r.otl}</td><td>${r.so}</td>
-      <td><strong>${r.pts.toFixed(1)}</strong></td>
+      <td>${r.name}</td>
+      <td>${r.position}</td>
+      <td>${r.team}</td>
+      <td>${r.mj}</td>
+      <td>${r.goals}</td>
+      <td>${r.assists}</td>
+      <td>${r.win}</td>
+      <td>${r.otl}</td>
+      <td>${r.so}</td>
+      <td><strong>${r.points.toFixed(1)}</strong></td>
       <td><button class="secondary" data-open-player="${r.name}">Voir</button></td>`;
     tbody.appendChild(tr);
   });
@@ -1253,7 +1290,7 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Ouvre le détail quotidien du joueur
+  // Ouvre le détail quotidien
   cont.querySelectorAll('[data-open-player]').forEach(btn => {
     btn.onclick = () => {
       const name = btn.getAttribute('data-open-player');
@@ -1263,11 +1300,12 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
     };
   });
 
-  // Vide la table quotidienne tant qu’aucun joueur n’est sélectionné
-  document.getElementById('pooler-daily-title').style.display = 'none';
-  document.getElementById('pooler-daily-table').innerHTML = '';
+  // Nettoie la table quotidienne tant qu’aucun joueur n’est sélectionné
+  const titleDaily = document.getElementById('pooler-daily-title');
+  const daily = document.getElementById('pooler-daily-table');
+  if (titleDaily) titleDaily.style.display = 'none';
+  if (daily) daily.innerHTML = '';
 }
-
 function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
   const title = document.getElementById('pooler-daily-title');
   const cont  = document.getElementById('pooler-daily-table');
@@ -1335,25 +1373,25 @@ function openPoolerModal(poolerName) {
   const dlg = document.getElementById('pooler-modal');
   if (!dlg) return;
 
-  // Déterminer min/max dates des stats du pooler
+  // calcule min/max à partir des stats du pooler
   const roster = (state.poolers || []).find(p => p.name === poolerName)?.players || [];
   const dateSet = new Set();
   roster.forEach(name => Object.keys(state.stats[name] || {}).forEach(d => dateSet.add(d)));
   const dates = Array.from(dateSet).sort();
   const minD = dates[0] || '';
-  const maxD = dates[dates.length-1] || '';
+  // Par défaut, Au = aujourd'hui (si pas de stats max)
+  const today = new Date().toISOString().slice(0,10);
+  const maxD = dates[dates.length-1] || today;
 
   document.getElementById('pooler-modal-title').textContent = `Vue — ${poolerName}`;
   document.getElementById('pooler-from').value = minD;
   document.getElementById('pooler-to').value   = maxD;
 
-  // Rendu initial
   renderPoolerPlayersTable(poolerName, minD, maxD);
 
-  // Bind filtres
   document.getElementById('pooler-apply').onclick = () => {
     const f = document.getElementById('pooler-from').value;
-    const t = document.getElementById('pooler-to').value;
+    const t = document.getElementById('pooler-to').value || today; // <= si vide → aujourd'hui
     renderPoolerPlayersTable(poolerName, f, t);
   };
   document.getElementById('pooler-close').onclick = () => dlg.close();
@@ -1381,7 +1419,7 @@ async function bootAuthThenApp() {
   takeRemoteFromURL();    // option : ?poolers=...&rosters=...&stats=... => mémorise les URLs CSV
   await tryTokenFromURL(); // option : ?token=... (ou #token=...), vérifie signature/audience/exp/role
   applyAccessControls();  // montre/masque la gate et les sections [data-role="manager-only"]
-
+  setStatusWarn('Prêt — en attente de synchronisation…');
   // 2) Pas authentifié -> on s'arrête ici (l'app reste masquée derrière la gate)
   const appRoot = document.getElementById('app-root');
   if (!appRoot || appRoot.hidden) return;
@@ -1433,12 +1471,12 @@ if (clientRefreshBtn) {
     try {
       setStatusWarn('Rafraîchissement…');
       await refreshAllRemote();
-      const p = (state.players||[]).length;
+      const p  = (state.players||[]).length;
       const pl = (state.poolers||[]).length;
       const sp = Object.keys(state.stats||{}).length;
-      setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats joueurs: ${sp}`);
+      setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats: ${sp}`);
       computeAndRender();
-    } catch(e) {
+    } catch (e) {
       console.warn('client refresh error:', e);
       setStatusErr('Erreur durant le rafraîchissement');
     }
