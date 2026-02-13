@@ -517,3 +517,10 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
 .stat { background:#101b33; border:1px solid #263a66; border-radius:8px; padding:6px 8px; text-align:center; font-size:13px; color:#cfe2ff; }
 .stat .v { display:block; font-weight:800; font-size:16px; color:#eaf3ff; }
 .day-head { display:flex; justify-content:space-between; gap:8px; margin-bottom:6px; color:#cfe2ff; font-weight:600; }
+/* ===== Classement : bascule par classe sur #leaderboard-wrap ===== */
+#leaderboard-cards { display: none; }                 /* cartes cachées par défaut */
+#leaderboard-wrap.cards-on #leaderboard { display: none !important; }
+#leaderboard-wrap.cards-on #leaderboard-cards { display: block !important; }
+
+/* (Facultatif) un peu d'espacement entre les cartes */
+#leaderboard-cards .lb-card { margin-bottom: 10px; }
