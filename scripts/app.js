@@ -243,21 +243,83 @@ function safeFixed(v, d = 1) {
   return Number.isFinite(n) ? n.toFixed(d) : (0).toFixed(d);
 }
 
-// Active/désactive les cartes mobile (peut être mis à false si besoin de rollback rapide)
+// Flag sécurité : mets false si tu dois rollback instantanément
 var SAFE_MOBILE_CARDS = true;
 
+// Détecte “mobile”
 function isMobile() {
   var w = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1024;
   var dw = (document.documentElement && document.documentElement.clientWidth) ? document.documentElement.clientWidth : w;
   return ((w || dw) <= 768);
 }
 
+function renderLeaderboardCardsMobile() {
+  try {
+    // Conditions pour afficher les cartes
+    if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
+
+    var host    = document.getElementById('leaderboard-cards');
+    var tblHost = document.getElementById('leaderboard');
+    if (!host || !tblHost) return;
+
+    host.innerHTML = '';
+
+    // Recalcule les scores (total + today + yest)
+    var totals = [];
+    try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
+
+    // Rendu minimal si aucun pooler
+    if (!totals.length) {
+      host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
+    } else {
+      for (var i=0; i<totals.length; i++) {
+        var r = totals[i];
+        var card = document.createElement('div');
+        card.className = 'lb-card';
+        card.innerHTML =
+          '<div class="lb-head">' +
+            '<div class="lb-rank">'+ (i+1) +'</div>' +
+            '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
+            '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
+          '</div>' +
+          '<div class="lb-sub">' +
+            '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
+            '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
+          '</div>';
+        host.appendChild(card);
+      }
+    }
+
+    // Si on a bien quelque chose dans host, bascule en “cartes”, sinon garde “table”
+    if (host.children.length > 0) showLeaderboardMode('cards');
+    else                          showLeaderboardMode('table');
+
+    // Clic -> modale
+    var btns = host.querySelectorAll('[data-open-pooler]');
+    for (var j=0; j<btns.length; j++) {
+      (function(b){
+        b.onclick = function(){ openPoolerModal(b.getAttribute('data-open-pooler')); };
+      })(btns[j]);
+    }
+  } catch (e) {
+    console.warn('renderLeaderboardCardsMobile error:', e);
+    showLeaderboardMode('table');
+  }
+}
+
 function showLeaderboardMode(mode){
-  var tbl  = document.getElementById('leaderboard');
-  var cards= document.getElementById('leaderboard-cards');
-  if (!tbl || !cards) return;
-  if (mode === 'cards') { tbl.style.display = 'none'; cards.style.display = 'block'; }
-  else                  { tbl.style.display = '';     cards.style.display = 'none'; }
+  var wrap  = document.getElementById('leaderboard-wrap');
+  var tbl   = document.getElementById('leaderboard');
+  var cards = document.getElementById('leaderboard-cards');
+  if (!wrap || !tbl || !cards) return;
+
+  if (mode === 'cards') {
+    // On bascule par la classe sur le WRAPPER (surpasse le !important global)
+    if (wrap.className.indexOf('cards-on') === -1) wrap.className += (wrap.className ? ' ' : '') + 'cards-on';
+  } else {
+    // Retire 'cards-on'
+    wrap.className = (wrap.className || '').replace(/\bcards-on\b/g, '').trim();
+  }
 }
 
 function showModalListsMode(mode){
@@ -1459,56 +1521,6 @@ function compactLeaderboardHeadersIfSmall(){
     ths[2].innerHTML = 'Points total';
     ths[3].textContent = 'Points hier';
     ths[4].textContent = 'Points aujourd’hui';
-  }
-}
-function renderLeaderboardCardsMobile() {
-  if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
-
-  var host = document.getElementById('leaderboard-cards');
-  var tblHost = document.getElementById('leaderboard');
-  if (!host || !tblHost) return;
-
-  host.innerHTML = '';
-
-  var totals = [];
-  try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
-
-  // Rendre les cartes
-  if (!totals.length) {
-    host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
-  } else {
-    for (var i=0; i<totals.length; i++) {
-      var r = totals[i];
-      var card = document.createElement('div');
-      card.className = 'lb-card';
-      card.innerHTML =
-        '<div class="lb-head">' +
-          '<div class="lb-rank">'+ (i+1) +'</div>' +
-          '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
-          '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
-        '</div>' +
-        '<div class="lb-sub">' +
-          '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
-          '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
-        '</div>';
-      host.appendChild(card);
-    }
-  }
-
-  // Si on a bien quelque chose, on bascule en mode cartes
-  if (host.children.length > 0) {
-    showLeaderboardMode('cards');
-  } else {
-    // Sécurité : on garde le tableau
-    showLeaderboardMode('table');
-  }
-
-  // Clic -> modale
-  var btns = host.querySelectorAll('[data-open-pooler]');
-  for (var j=0; j<btns.length; j++) {
-    (function(b){
-      b.onclick = function(){ openPoolerModal(b.getAttribute('data-open-pooler')); };
-    })(btns[j]);
   }
 }
 
