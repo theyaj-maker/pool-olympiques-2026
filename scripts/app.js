@@ -419,6 +419,7 @@ async function loadRostersFromCSV(url){
   renderPoolers?.();
   refreshDraftPooler?.();
   renderRosterView?.();
+  renderPoolersCardsMobile();
   computeAndRender?.();
 }
 // Poolers CSV attendu : pooler,skaters,goalies
@@ -1015,7 +1016,53 @@ function renderPoolers(){
   table.appendChild(tbody);
   cont.innerHTML = '';
   cont.appendChild(table);
+  renderPoolersCardsMobile();
 }
+
+function renderPoolersCardsMobile(){
+  const cont = document.getElementById('poolers-cards');
+  if (!cont) return;
+
+  // Nettoie
+  cont.innerHTML = '';
+
+  // Seulement en mobile : si on n'est pas en mobile, sort (la CSS masque déjà)
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  if (!isMobile) return;
+
+  const poolers = (state.poolers || []).filter(Boolean);
+  poolers.forEach(pl => {
+    // Comptage slots
+    const skMax = Number(pl?.roster?.skaters || 0);
+    const goMax = Number(pl?.roster?.goalies || 0);
+    const roster = Array.isArray(pl.players) ? pl.players : [];
+
+    let skCount = 0, goCount = 0;
+    const chips = roster.map(name => {
+      const meta = (state.players || []).find(p => p.name === name) || {};
+      const pos = (meta.position || 'F').toUpperCase();
+      if (pos === 'G') goCount++; else skCount++;
+      const cls = ['tag', pos].join(' ');
+      return `<span class="${cls}">${name}</span>`;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'pooler-card';
+    card.innerHTML = `
+      <div class="pooler-head">
+        <div class="pooler-name">${pl.name}</div>
+        <div class="pooler-slots">
+          Skaters&nbsp;${skCount}/${skMax} · Gardiens&nbsp;${goCount}/${goMax}
+        </div>
+      </div>
+      <div class="roster-list-wrap">
+        <div class="roster-list">${chips.join(' ') || '<em>Aucun joueur</em>'}</div>
+      </div>
+    `;
+    cont.appendChild(card);
+  });
+}
+
 function bindPoolers(){
   qs('#add-pooler').onclick = ()=>{
     const name = qs('#pooler-name').value.trim(); if(!name) return alert('Nom requis');
@@ -1117,6 +1164,7 @@ rm.setAttribute('data-role','manager-only');
     State.save(state);
     renderPoolers();
     renderRosterView();
+    renderPoolersCardsMobile();
     computeAndRender();
   };
   td.appendChild(rm);
@@ -1726,6 +1774,16 @@ function openPoolerModal(poolerName) {
   openDialogSafe(dlg);
 }
 
+function placeLeaderboardFirstOnMobile(){
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  if (!isMobile) return;
+  const main = document.querySelector('main');
+  const lb  = document.getElementById('leaderboard-section');
+  if (main && lb && main.firstElementChild !== lb) {
+    main.insertBefore(lb, main.firstElementChild);
+  }
+}
+
 function init(){
   renderScoring(); bindScoring();
   renderPlayers(); bindPlayers(); refreshPlayersDatalist();
@@ -1765,6 +1823,7 @@ if (document.getElementById('players-list')) {
   renderBoxDraftUI();         bindBoxDraft();
   bindStats();                bindRemoteSourcesUI();
   computeAndRender();
+  renderPoolersCardsMobile();
 
   const recomputeBtn = document.getElementById('recompute');
 if (recomputeBtn) {
@@ -1813,6 +1872,8 @@ if (clientRefreshBtn) {
 }
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
+window.addEventListener('resize', placeLeaderboardFirstOnMobile, { passive: true });
+placeLeaderboardFirstOnMobile();
 
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') {
