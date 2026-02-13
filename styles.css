@@ -1,465 +1,163 @@
-*{box-sizing:border-box}body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0b1020;color:#eef}a{color:#8fd}
-header{padding:24px 16px;background:#121a35;border-bottom:1px solid #223}
-header h1{margin:0 0 4px;font-size:24px}
-.subtitle{margin:0;color:#b7c3ff}
-main{max-width:1100px;margin:0 auto;padding:16px;}
-.card{background:#11192f;border:1px solid #223;border-radius:10px;padding:16px;margin:16px 0}
-.card h2{margin-top:0}
-.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
-label{display:block;margin:6px 0}
-input,select,button{padding:8px;border-radius:8px;border:1px solid #334;background:#0b1430;color:#eef}
-input[type="number"]{width:120px}
-button{background:#2e6bff;border-color:#2e6bff;cursor:pointer}
-button.secondary{background:#0b1430;border-color:#445}
-button:disabled{opacity:.5;cursor:not-allowed}
-.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
-.table{border:1px solid #223;border-radius:8px;overflow:auto}
-.table table{width:100%;border-collapse:collapse}
-.table th,.table td{padding:8px;border-bottom:1px solid #223;text-align:left}
-.table tr:nth-child(even){background:#0d1632}
-.hint{color:#a9b5ff;font-size:0.9em}
-.muted{color:#9ab}
-footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}
-
-/* Portail d'accès */
-.gate {
-  max-width: 760px;
-  margin: 10vh auto;
-  background: #11192f;
-  border: 1px solid #223;
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-}
-.gate textarea {
-  width: 100%;
-  max-width: 100%;
-  min-height: 110px;
-}
-.gate .actions {
-  justify-content: center;
-}
-.gate .muted {
-  color: #9ab;
-  margin-top: 8px;
+/* ===============================
+   RESET + BASE
+   =============================== */
+body {
+  margin: 0;
+  padding: 0;
+  background: #0d1526;
+  color: #eaf3ff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Grille de sélection par boîtes */
-.box-draft-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-  gap:12px;
-  margin:8px 0 12px;
-}
-.box-card{
-  border:1px solid #223;
-  border-radius:8px;
-  padding:10px;
-  background:#0d1632;
-}
-.box-card h4{
-  margin:0 0 8px;
-  font-size:14px;
-  color:#b7c3ff;
-}
-/* (optionnel) masquer l'ancien champ de saisie libre si tu veux */
-.hide-legacy-draft #draft-player, 
-.hide-legacy-draft #draft-add{
-  display:none !important;
+/* Structure des cartes */
+.card {
+  background: #111a2f;
+  border: 1px solid #2a3d66;
+  border-radius: 10px;
+  padding: 16px;
+  margin: 12px;
 }
 
+/* Boutons */
+button,
+.btn-ghost {
+  padding: 8px 14px;
+  font-size: 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #1d2f57;
+  border: 1px solid #345087;
+  color: #dfeaff;
+}
+button:hover,
+.btn-ghost:hover {
+  background: #29406f;
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid #5b6a8b;
+  color: #b9c4d9;
+}
+button.secondary:hover {
+  background: #1b2336;
+}
+
+/* Liens bouton (pooler dans classement) */
 .link-btn {
-  background: none; border: none; color: #7fc5ff;
-  text-decoration: underline; cursor: pointer; padding: 0;
+  background: none;
+  border: none;
+  color: #7fc5ff;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
 }
-.link-btn:hover { color: #bfe3ff; }
-
-
-
-/* Badge : visible et lisible */
-.status-badge{
-  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
-  display: inline-flex; gap: 8px; align-items: center;
-  padding: 6px 10px; border-radius: 999px; font-weight: 600;
-  box-shadow: 0 2px 10px rgba(0,0,0,.25); z-index: 10000;
-  background: #1d2a4a; color: #eaf3ff; border: 1px solid #385a9b;
+.link-btn:hover {
+  color: #bfe3ff;
 }
-.status-badge.ok   { background:#0d3a1d; border-color:#1c7a3b; color:#eafff2; }
-.status-badge.warn { background:#3a310d; border-color:#7a6a1c; color:#fff8e6; }
-.status-badge.err  { background:#3a0d0d; border-color:#7a1c1c; color:#ffecec; }
-.status-badge .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
-.status-badge.ok   .dot { background:#35d27a; }
-.status-badge.warn .dot { background:#e9c23a; }
-.status-badge.err  .dot { background:#ff6b6b; }
 
-
-/* === Toolbar client (bouton global refresh) === */
-.client-toolbar{
-  position: fixed; top: 56px; right: 12px; z-index: 9999;
-  display: flex; gap: 8px; align-items: center;
+/* Inputs */
+input, select {
+  padding: 6px 10px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #38527e;
+  background: #0f1729;
+  color: #eaf3ff;
 }
-.btn-ghost{
-  background: transparent; border: 1px solid #5a6a9b; color: #cfe2ff;
-  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+
+/* ===============================
+   TABLES GÉNÉRALES
+   =============================== */
+.table {
+  width: 100%;
+  border-collapse: collapse;
 }
-.btn-ghost:hover{ background:#182544; }
-.btn-ghost.small{ font-size: 12px; padding: 4px 8px; }
+.table th, .table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #24375a;
+  white-space: nowrap;
+}
+.table th {
+  text-align: left;
+  color: #c8d7f0;
+}
 
+/* Désactiver zébrage dans modale et zones marquées */
+dialog .table tr:nth-child(even),
+.no-zebra .table tr:nth-child(even),
+.table.no-zebra tr:nth-child(even) {
+  background: transparent !important;
+}
 
-/* Cacher toutes les actions d’édition côté viewer */
+/* ===============================
+   MASQUAGE VIEWER
+   =============================== */
 body[data-role="viewer"] .only-manager,
 body[data-role="viewer"] [data-role="manager-only"] {
   display: none !important;
 }
 
-
-/* Désactiver le zébrage (alternance) dans les modales et zones marquées */
-dialog .table tr:nth-child(even),
-.no-zebra .table tr:nth-child(even),
-.table.no-zebra tr:nth-child(even) { background: transparent !important; }
-
-/* Séparateur visuel après "Points total" dans le classement */
-.leaderboard-table th:nth-child(4),
-.leaderboard-table td:nth-child(4) {
-  border-left: 2px solid #2c3e70;   /* couleur de séparation (à ajuster) */
-}
-
-/* Optionnel : léger padding pour aérer côté droit de "Points total" */
-.leaderboard-table th:nth-child(3),
-.leaderboard-table td:nth-child(3) {
-  padding-right: 10px;
-}
-
-.leaderboard-table th:nth-child(3),
-.leaderboard-table td:nth-child(3) {
-  border-right: 2px solid #2c3e70;
-}
-
-/* === Classement : table avec classes .table.leaderboard-table === */
-
-/* Surbrillance de la colonne "Points total" (3e colonne) */
-.leaderboard-table th:nth-child(3),
-.leaderboard-table td:nth-child(3) {
-  background: rgba(255, 215, 0, 0.08);   /* léger fond doré */
-  color: #fff;                            /* texte blanc (ajuste selon thème) */
-  font-weight: 700;                       /* gras pour attirer l’œil */
-}
-
-/* Option : renforcer la valeur dans la cellule (si tu as <strong> côté JS) */
-.leaderboard-table td:nth-child(3) strong {
-  color: #ffe27a;
-}
-
-/* Séparateur visuel entre "Points total" et les colonnes journalières (4e col = "Points hier") */
-.leaderboard-table th:nth-child(4),
-.leaderboard-table td:nth-child(4) {
-  border-left: 2px solid #2c3e70;        /* ajuste la couleur au thème */
-}
-
-/* (Facultatif) un peu d’air à droite de la 3e colonne */
-.leaderboard-table th:nth-child(3),
-.leaderboard-table td:nth-child(3) {
-  padding-right: 10px;
-}
-/* Icône 🥇 dans l’en-tête "Points total" (3e colonne) */
-.leaderboard-table thead th:nth-child(3)::before {
-  content: "🥇 ";
-}
-
-/* Accessibilité : si tu veux un intitulé plus explicite au survol */
-.leaderboard-table thead th:nth-child(3) {
-  position: relative;
-}
-.leaderboard-table thead th:nth-child(3)::after {
-  content: "Points total";
-  /* rien d’affiché, mais utile si tu utilises un lecteur ou un style alt */
-  position: absolute;
-  left: -9999px;
-  top: auto;
-  width: 1px; height: 1px;
-  overflow: hidden;
-}
-
-/* Container "carte" : marges plus compactes sur mobile */
-@media (max-width: 768px) {
-  .card { padding: 12px; margin: 10px 8px; }
-  h2, h3 { font-size: 1.05rem; }
-  label, input, select, button { font-size: 16px; } /* evite zoom iOS */
-  .grid-2 { display: block; } /* stack en 1 colonne */
-  .actions { flex-wrap: wrap; gap: 8px; }
-}
-
-/* Tables: scroll horizontal fluide sur mobile */
-.table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 8px 10px; white-space: nowrap; }
-.table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.table thead, .table tbody, .table tr { display: table; width: 100%; table-layout: fixed; }
-
-/* Touch targets and buttons */
-button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
-
-/* Dialog plein écran en mobile si pas showModal natif */
-@media (max-width: 768px) {
-  dialog[open] {
-    width: 100vw; max-width: none;
-    height: 90vh; margin: 0; top: 5vh;
-  }
-}
-
-/* =========================================
-   MOBILE (≤ 768px) : ordre & présentation
-   ========================================= */
-@media (max-width: 768px) {
-  /* 1) Positionner le CLASSEMENT en premier visuellement */
-  #leaderboard-section { order: 1; }
-  #poolers-section     { order: 2; }
-  /* Les autres sections suivent */
-  .card { order: 10; } /* valeur par défaut si non précisée */
-
-  /* 2) Poolers en cartes (au lieu d’un tableau large) */
-  #poolers-list.table { display: none; } /* cache le tableau en mobile */
-  #poolers-cards { display: grid; gap: 10px; }
-  #poolers-cards .pooler-card {
-    background: #0f1729; border: 1px solid #223155; border-radius: 10px;
-    padding: 10px 12px;
-  }
-  #poolers-cards .pooler-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 8px; margin-bottom: 8px;
-  }
-  #poolers-cards .pooler-name { font-weight: 700; font-size: 1.05rem; color:#eaf3ff; }
-  #poolers-cards .pooler-slots { font-size: .9rem; color:#9fb1d9; }
-  #poolers-cards .roster-list {
-    display: flex; flex-wrap: wrap; gap: 6px 10px;
-    list-style: none; margin: 0; padding: 0;
-  }
-  #poolers-cards .tag {
-    display: inline-block; padding: 3px 8px; border-radius: 999px;
-    background: #1a2444; color: #dbe7ff; border: 1px solid #364a7a;
-    font-size: .85rem;
-  }
-  #poolers-cards .tag.G { background:#1d2e1d; border-color:#2f5d2f; color:#dff9df; }    /* Gardien */
-  #poolers-cards .tag.D { background:#2b2433; border-color:#5c3c7a; color:#f0e2ff; }    /* Défenseur */
-  #poolers-cards .tag.F { background:#1a2444; border-color:#364a7a; color:#dbe7ff; }    /* Attaquant */
-}
-
-/* Desktop : montrer le tableau, masquer les cartes  */
-@media (min-width: 769px) {
-  #poolers-cards { display: none; }
-}
-
-/* =========================================
-   CLASSEMENT : lisibilité mobile
-   ========================================= */
-
-/* La table de classement garde ses classes */
-.leaderboard-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-/* Rendre la table scrollable horizontalement en mobile */
-@media (max-width: 768px) {
-  /* Le conteneur (#leaderboard) doit pouvoir scroller */
-  #leaderboard {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Table layout fixe + largeurs mini par colonne */
-  .leaderboard-table {
-    table-layout: fixed;
-    min-width: 540px; /* force un minimum pour éviter l’écrasement */
-  }
-
-  /* Colonnes (#, Pooler, Points total, Points hier, Points aujourd’hui) */
-  .leaderboard-table th:nth-child(1),
-  .leaderboard-table td:nth-child(1) { width: 48px; min-width: 48px; }
-
-  .leaderboard-table th:nth-child(2),
-  .leaderboard-table td:nth-child(2) { 
-    width: 180px; min-width: 180px; 
-    white-space: normal;            /* autorise retour à la ligne du nom */
-    word-break: break-word;
-  }
-
-  .leaderboard-table th:nth-child(3),
-  .leaderboard-table td:nth-child(3) { width: 120px; min-width: 120px; }
-
-  .leaderboard-table th:nth-child(4),
-  .leaderboard-table td:nth-child(4),
-  .leaderboard-table th:nth-child(5),
-  .leaderboard-table td:nth-child(5) { width: 120px; min-width: 120px; }
-
-  /* Un peu plus d’air dans les cellules */
-  .leaderboard-table th, .leaderboard-table td {
-    padding: 10px 12px;
-    font-size: 15px;
-    line-height: 1.3;
-  }
-
-  /* Le bouton-lien du pooler doit pouvoir revenir à la ligne */
-  .leaderboard-table .link-btn {
-    white-space: normal;
-    text-align: left;
-  }
-}
-
-/* Séparateur visuel après "Points total" (déjà ajouté, on garde) */
-.leaderboard-table th:nth-child(4),
-.leaderboard-table td:nth-child(4) {
-  border-left: 2px solid #2c3e70;
-}
-
-/* Surbrillance "Points total" (déjà ajouté, on garde l’accent) */
-.leaderboard-table th:nth-child(3),
-.leaderboard-table td:nth-child(3) {
-  background: rgba(255, 215, 0, 0.08);
-  color: #fff;
-  font-weight: 700;
-}
-.leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
-
-/* =========================================
-   BADGE DE SYNCHRO : ne pas chevaucher
-   ========================================= */
-
-/* Par défaut : en haut-centre (desktop) — si tu utilises déjà ces styles, garde-les. */
+/* ===============================
+   BADGE STATUT
+   =============================== */
 .status-badge{
-  position: fixed; z-index: 10000;
-  top: 8px; left: 50%; transform: translateX(-50%);
+  position: fixed;
+  z-index: 10000;
+  top: 10px;
+  right: 10px;
+  background: #1d2a4a;
+  border: 1px solid #385a9b;
+  color: #eaf3ff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
+.status-badge.ok   { background:#0d3a1d; border-color:#1c7a3b; color:#eafff2; }
+.status-badge.warn { background:#3a310d; border-color:#7a6a1c; color:#fff8e6; }
+.status-badge.err  { background:#3a0d0d; border-color:#7a1c1c; color:#ffecec; }
 
-/* Sur mobile : passe en haut-droit, et on libère un padding-top via le body */
-@media (max-width: 768px) {
-  .status-badge{
-    top: 10px; right: 10px; left: auto; transform: none;
-  }
-  /* Réserve de l’espace en haut pour éviter que le badge chevauche le premier bloc */
-  body.has-status-badge {
-    padding-top: 56px;   /* ajuste si besoin selon la taille du badge */
-  }
+.status-badge .dot {
+  width: 10px; height: 10px; border-radius: 50%; display:inline-block;
 }
+.status-badge.ok   .dot { background:#35d27a; }
+.status-badge.warn .dot { background:#e9c23a; }
+.status-badge.err  .dot { background:#ff6b6b; }
 
-/* =========================================
-   CLASSEMENT — mode compact (mobile)
-   ========================================= */
+/* Réserve en haut pour ne pas chevaucher */
+body.has-status-badge { padding-top: 56px; }
 
-/* Table standard (desktop) déjà stylée ailleurs */
+/* ===============================
+   CLASSEMENT (leaderboard)
+   =============================== */
 
-/* Mobile ≤ 768px : compact sans scroll si possible */
-@media (max-width: 768px) {
-  /* Le conteneur ne scrolle que si vraiment nécessaire */
-  #leaderboard {
-    display: block;
-    overflow-x: hidden;              /* on désactive le scroll par défaut */
-  }
-
-  /* Table compacte : auto-layout + cellules respirent moins */
-  .leaderboard-table {
-    table-layout: auto;              /* laisse le navigateur serrer intelligemment */
-    width: 100%;
-  }
-
-  .leaderboard-table th,
-  .leaderboard-table td {
-    padding: 6px 8px;                /* padding réduit */
-    font-size: 14px;                 /* police réduite */
-    line-height: 1.2;
-    white-space: normal;             /* autorise les retours à la ligne */
-    word-break: break-word;
-  }
-
-  /* Colonne # étroite */
-  .leaderboard-table th:nth-child(1),
-  .leaderboard-table td:nth-child(1) {
-    width: 36px;
-    min-width: 36px;
-    text-align: center;
-  }
-
-  /* Colonne "Pooler" peut s'étendre sur 2 lignes */
-  .leaderboard-table th:nth-child(2),
-  .leaderboard-table td:nth-child(2) {
-    width: auto;                     /* laisse de la place au nom */
-  }
-  .leaderboard-table .link-btn {
-    white-space: normal;
-    text-align: left;
-  }
-
-  /* Colonne "Points total" en surbrillance (déjà définie), on garde l'accent
-     et on réduit très légèrement la graisse pour gagner de la place visuelle */
-  .leaderboard-table th:nth-child(3),
-  .leaderboard-table td:nth-child(3) {
-    background: rgba(255, 215, 0, 0.08);
-    color: #fff;
-    font-weight: 700;
-  }
-  .leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
-
-  /* Séparateur juste après "Points total" (col 4 = Points hier) */
-  .leaderboard-table th:nth-child(4),
-  .leaderboard-table td:nth-child(4) {
-    border-left: 2px solid #2c3e70;
-  }
-
-  /* Réduit le libellé en 2 lignes si besoin (automatique grâce à white-space: normal) */
-  .leaderboard-table th {
-    text-align: left;
-  }
-  
-.leaderboard-table td:nth-child(3),
-  .leaderboard-table td:nth-child(4),
-  .leaderboard-table td:nth-child(5) { text-align: right; }
-
-  /* Ultra-compact (≤ 420px) : encore un cran de densité */
-  @media (max-width: 420px) {
-    .leaderboard-table th,
-    .leaderboard-table td {
-      padding: 5px 6px;
-      font-size: 13px;
-    }
-    /* “Pooler” peut aller jusqu’à 3 lignes sur très petit écran */
-    .leaderboard-table td:nth-child(2) .link-btn {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-  }
-}
-
-/* =========================================================
-   CLASSEMENT — Wrapper & table
-   ========================================================= */
-
-/* Le wrapper assure le scroll horizontal si besoin */
+/* Wrapper scroll */
 #leaderboard-wrap {
   width: 100%;
-  overflow-x: auto;                 /* permet le défilement si trop serré */
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* La table du classement */
 .leaderboard-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: auto;               /* laisse le navigateur optimiser les largeurs */
+  table-layout: auto;
 }
 
-/* Cellules par défaut */
+/* Cellules */
 .leaderboard-table th,
 .leaderboard-table td {
   padding: 8px 10px;
   line-height: 1.25;
   font-size: 15px;
-  white-space: normal;              /* autorise les retours à la ligne */
-  word-break: break-word;           /* casse les mots longs */
+  white-space: normal;
+  word-break: break-word;
 }
 
-/* # (col 1) étroite et centrée */
+/* Colonne # */
 .leaderboard-table th:nth-child(1),
 .leaderboard-table td:nth-child(1) {
   width: 36px;
@@ -467,78 +165,142 @@ button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
   text-align: center;
 }
 
-/* Pooler (col 2) peut s'étendre et passer sur 2 lignes */
-.leaderboard-table th:nth-child(2),
-.leaderboard-table td:nth-child(2) {
-  width: auto;
-}
-.leaderboard-table .link-btn {
+/* Colonne Pooler */
+.leaderboard-table td:nth-child(2) .link-btn {
   white-space: normal;
-  text-align: left;
 }
 
-/* Points total (col 3) — surbrillance + valeur accentuée */
+/* Surbrillance 3e colonne (Points total) */
 .leaderboard-table th:nth-child(3),
 .leaderboard-table td:nth-child(3) {
   background: rgba(255, 215, 0, 0.08);
   color: #fff;
   font-weight: 700;
 }
-.leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
+.leaderboard-table td:nth-child(3) strong {
+  color: #ffe27a;
+}
 
-/* Séparateur avant "Points hier" (col 4) */
+/* Séparateur après Points total */
 .leaderboard-table th:nth-child(4),
 .leaderboard-table td:nth-child(4) {
   border-left: 2px solid #2c3e70;
 }
 
-/* Chiffres alignés à droite pour compacter visuellement */
+/* Colonnes chiffrées alignées à droite */
 .leaderboard-table td:nth-child(3),
 .leaderboard-table td:nth-child(4),
 .leaderboard-table td:nth-child(5) {
   text-align: right;
 }
 
-/* =========================================================
-   MODE COMPACT MOBILE (≤ 768px)
-   ========================================================= */
+/* ===============================
+   MOBILE ≤ 768px : compact
+   =============================== */
 @media (max-width: 768px) {
-  /* On réduit légèrement la densité sans nuire à la lisibilité */
+
   .leaderboard-table th,
   .leaderboard-table td {
-    padding: 6px 8px;               /* padding réduit */
-    font-size: 14px;                /* police réduite */
+    padding: 6px 8px;
+    font-size: 14px;
     line-height: 1.2;
   }
 
-  /* L'en-tête peut prendre 2 lignes (grâce à white-space: normal) */
   .leaderboard-table th { text-align: left; }
 
-  /* Très petits écrans (≤ 420px) : un cran de plus */
-  @media (max-width: 420px) {
-    .leaderboard-table th,
-    .leaderboard-table td {
-      padding: 5px 6px;
-      font-size: 13px;
-    }
-    /* Nom de pooler max 3 lignes avec ellipsis multi-lignes */
-    .leaderboard-table td:nth-child(2) .link-btn {
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
+  /* Pooler : max 3 lignes */
+  .leaderboard-table td:nth-child(2) .link-btn {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }
 
-/* =========================================================
-   BADGE de synchro — en haut-droit + évite chevauchement
-   ========================================================= */
-.status-badge{
-  position: fixed; z-index: 10000;
-  top: 10px; right: 10px;           /* coin haut-droit */
-  left: auto; transform: none;
+/* Ultra compact ≤ 420px */
+@media (max-width: 420px) {
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 5px 6px;
+    font-size: 13px;
+  }
+
+  .leaderboard-table td:nth-child(2) .link-btn {
+    -webkit-line-clamp: 4;
+  }
+}
+
+/* ===============================
+   POOLERS — Cartes mobile
+   =============================== */
+
+/* Desktop: pas de cartes */
+@media (min-width: 769px) {
+  #poolers-cards { display: none; }
+}
+
+/* Mobile: affichage cartes */
+@media (max-width: 768px) {
+  #poolers-list.table { display: none !important; }
+
+  #poolers-cards {
+    display: grid;
+    gap: 10px;
+    margin: 12px;
+  }
+  .pooler-card {
+    background: #0f1729;
+    border: 1px solid #223155;
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .pooler-head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .pooler-name {
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+  .pooler-slots {
+    font-size: .85rem;
+    color:#a8b5d7;
+  }
+  .roster-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    list-style: none; margin:0; padding:0;
+  }
+  .tag {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background:#1a2444;
+    border:1px solid #364a7a;
+    font-size:.8rem;
+  }
+  .tag.G { background:#1d2e1d; border-color:#2f5d2f; color:#dff9df; }
+  .tag.D { background:#2b2433; border-color:#5c3c7a; color:#f0e2ff; }
+  .tag.F { background:#1a2444; border-color:#364a7a; color:#dbe7ff; }
+}
+
+/* ===============================
+   DIALOG / MODALES
+   =============================== */
+dialog::backdrop {
+  background: rgba(0,0,0,0.55);
+}
+dialog {
+  border: none;
+  border-radius: 10px;
+  background: #111a2f;
+  color: #eaf3ff;
+  padding: 16px;
 }
 @media (max-width: 768px) {
-  body.has-status-badge { padding-top: 56px; }  /* réserve l’espace */
+  dialog[open] {
+    width: 100vw; max-width: none;
+    height: 90vh; margin: 0; top: 5vh;
+  }
 }
