@@ -254,7 +254,6 @@ async function loadPlayersFromCSV(url){
     throw new Error('Joueurs CSV: colonne "name" (ou alias) introuvable');
   }
 
-  // Construit la liste maîtresse (remplace entièrement)
   const players = [];
   rows.forEach(r=>{
     const name = (r[idx.name]||'').toString().trim();
@@ -269,10 +268,9 @@ async function loadPlayersFromCSV(url){
 
   state.players = players;
   State.save(state);
-  refreshPlayersDatalist?.();   // si présent
-  renderPlayers?.('');          // si UI Joueurs visible
+  refreshPlayersDatalist?.();
+  renderPlayers?.('');
 }
-
 // Rosters CSV: pooler,player[,position,team,box] — position/team/box facultatifs
 async function loadRostersFromCSV(url){
   if (!url) return;
@@ -297,11 +295,12 @@ async function loadRostersFromCSV(url){
     throw new Error('Poolers CSV: colonnes requises (pooler,player) introuvables');
   }
 
-  // Indexe la liste maîtresse pour enrichissement rapide
+  // Indexe / enrichit la liste maîtresse
   const master = new Map((state.players||[]).map(p => [p.name.toLowerCase(), p]));
 
-  // Construit la map pooler -> roster (reset rosters d’après CSV)
-  const map = new Map(); // poolerName -> {name, roster:{skaters,goalies}, players:[]}
+  // Map temporaire solide (pas de trous) : pooler -> objet complet
+  const map = new Map();
+
   rows.forEach(r=>{
     const poolerName = (r[idx.pooler]||'').toString().trim();
     const playerName = (r[idx.player]||'').toString().trim();
@@ -312,7 +311,6 @@ async function loadRostersFromCSV(url){
     }
     if (!playerName) return;
 
-    // Ajoute au roster
     const pl = map.get(poolerName);
     if (!pl.players.includes(playerName)) pl.players.push(playerName);
 
@@ -335,9 +333,15 @@ async function loadRostersFromCSV(url){
     }
   });
 
+  // Écrit un tableau compact sans trous
   state.poolers = Array.from(map.values());
   State.save(state);
-  renderPoolers?.(); refreshDraftPooler?.(); renderRosterView?.(); computeAndRender?.();
+
+  // Rendu
+  renderPoolers?.();
+  refreshDraftPooler?.();
+  renderRosterView?.();
+  computeAndRender?.();
 }
 // Poolers CSV attendu : pooler,skaters,goalies
 async function loadPoolersFromCSV(url){
@@ -380,19 +384,14 @@ async function loadPoolersFromCSV(url){
 async function refreshAllRemote(){
   const src = getRemoteSources();
 
-  // 1) Joueurs (liste maîtresse) — facultatif mais recommandé
   if (src.playersUrl) {
     try { await loadPlayersFromCSV(src.playersUrl); }
     catch(e){ console.warn('Joueurs CSV:', e.message||e); }
   }
-
-  // 2) Poolers + rosters
   if (src.poolersUrl) {
     try { await loadRostersFromCSV(src.poolersUrl); }
     catch(e){ console.warn('Poolers CSV:', e.message||e); }
   }
-
-  // 3) Stats
   const elS = document.getElementById('stats-url');
   const statsUrl = (elS && elS.value) ? elS.value.trim() : (src.statsUrl || '');
   if (statsUrl) {
@@ -403,11 +402,8 @@ async function refreshAllRemote(){
       console.warn('Stats CSV:', e.message||e);
     }
   }
-
-  // 4) Rendu final
   computeAndRender?.();
 }
-
 // 🔓 expose pour tests console (modules ES ne mettent pas les fonctions en global)
 window.refreshAllRemote = refreshAllRemote;
 
