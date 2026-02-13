@@ -1276,22 +1276,56 @@ function bindStats() {
 // =====================================================
 
 // Renvoie la date locale sous forme 'YYYY-MM-DD' (en tenant compte du fuseau du navigateur)
-function localISODate(d) {
-  // Clone, et corrige avec le décalage de fuseau pour obtenir la "date civile" locale
-  const t = new Date(d.getTime() - d.getTimezoneOffset() * 60 * 1000);
-  return t.toISOString().slice(0, 10);
-}
 
+function localISODate(d) {
+  var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return t.toISOString().slice(0,10);
+}
 function getTodayAndYesterday() {
-  function localISODate(d) {
-    var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return t.toISOString().slice(0,10);
-  }
   var now = new Date();
   var todayStr = localISODate(now);
-  var y = new Date(now); y.setDate(now.getDate()-1);
+  var y = new Date(now); y.setDate(now.getDate() - 1);
   var yesterdayStr = localISODate(y);
   return { todayStr: todayStr, yesterdayStr: yesterdayStr };
+}
+
+function computeScoresWithDaily() {
+  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  var poolers = (state && state.poolers && state.poolers.length) ? state.poolers : [];
+  var statsByPlayer = (state && state.stats) ? state.stats : {};
+  var d = getTodayAndYesterday();
+  var out = [];
+
+  for (var i = 0; i < poolers.length; i++) {
+    var pl = poolers[i]; if (!pl || !pl.name) continue;
+    var roster = Array.isArray(pl.players) ? pl.players : [];
+    var total = 0, todayPts = 0, yestPts = 0;
+
+    for (var j = 0; j < roster.length; j++) {
+      var name = roster[j];
+      var days = statsByPlayer[name] || {};
+      var keys = Object.keys(days);
+
+      for (var k = 0; k < keys.length; k++) {
+        var v = days[keys[k]] || {};
+        var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
+        total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+      }
+      if (days[d.todayStr]) {
+        var vt = days[d.todayStr];
+        todayPts += Number(vt.goals||0)*s.goal + Number(vt.assists||0)*s.assist + Number(vt.win||0)*s.goalie_win + Number(vt.otl||0)*s.goalie_otl + Number(vt.so||0)*s.shutout;
+      }
+      if (days[d.yesterdayStr]) {
+        var vy = days[d.yesterdayStr];
+        yestPts += Number(vy.goals||0)*s.goal + Number(vy.assists||0)*s.assist + Number(vy.win||0)*s.goalie_win + Number(vy.otl||0)*s.goalie_otl + Number(vy.so||0)*s.shutout;
+      }
+    }
+
+    out.push({ pooler: pl.name, points: total, today: todayPts, yest: yestPts, rosterCount: roster.length });
+  }
+
+  out.sort(function(a,b){ return (b.points - a.points) || a.pooler.localeCompare(b.pooler); });
+  return out;
 }
 
 
@@ -1345,64 +1379,49 @@ function computeScores() {
 // Exposer pour debug en console (facultatif mais pratique)
 window.computeScores = computeScores;
 function renderLeaderboard() {
-  const cont = document.getElementById('leaderboard');
+  var cont = document.getElementById('leaderboard');
   if (!cont) return;
 
-  let totals = [];
-  try {
-    totals = computeScoresWithDaily() || [];
-  } catch (e) {
-    console.error('[Leaderboard] computeScoresWithDaily() error:', e);
-    totals = [];
-  }
+  var totals = [];
+  try { totals = computeScoresWithDaily() || []; } catch(e){ console.error('[Leaderboard] compute error:', e); totals = []; }
 
-  const table = document.createElement('table');
-  table.classList.add('table', 'leaderboard-table'); // ⬅️ ajoute la classe ici
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Pooler</th>
-        <th>Points total</th>
-        <th>Points hier</th>
-        <th>Points aujourd’hui</th>
-      </tr>
-    </thead>`;
-
-  const tbody = document.createElement('tbody');
+  var html = [];
+  html.push('<table class="table leaderboard-table">');
+  html.push('<thead><tr>');
+  html.push('<th>#</th>');
+  html.push('<th>Pooler</th>');
+  html.push('<th>🥇 Points total</th>');
+  html.push('<th>Points hier</th>');
+  html.push('<th>Points aujourd’hui</th>');
+  html.push('</tr></thead>');
+  html.push('<tbody>');
 
   if (!totals.length) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="5"><em>Aucun pooler à afficher</em></td>`;
-    tbody.appendChild(tr);
+    html.push('<tr><td colspan="5"><em>Aucun pooler à afficher</em></td></tr>');
   } else {
-    totals.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${i + 1}</td>
-        <td><button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button></td>
-        <td><strong>${Number(r.points || 0).toFixed(1)}</strong></td>
-        <td>${Number(r.yest  || 0).toFixed(1)}</td>
-        <td>${Number(r.today || 0).toFixed(1)}</td>`;
-      tbody.appendChild(tr);
-    });
+    for (var i=0; i<totals.length; i++) {
+      var r = totals[i];
+      html.push('<tr>');
+      html.push('<td>' + (i+1) + '</td>');
+      html.push('<td><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></td>');
+      html.push('<td><strong>' + Number(r.points||0).toFixed(1) + '</strong></td>');
+      html.push('<td>' + Number(r.yest||0).toFixed(1) + '</td>');
+      html.push('<td>' + Number(r.today||0).toFixed(1) + '</td>');
+      html.push('</tr>');
+    }
   }
 
-  table.appendChild(tbody);
-  cont.innerHTML = '';
-  cont.appendChild(table);
+  html.push('</tbody></table>');
+  cont.innerHTML = html.join('');
 
-  
-renderLeaderboardCardsMobile(); // cartes mobile
-
-
-
-  // Click pour ouvrir la modale "Vue pooler"
-  cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
-    btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
-  });
+  // clic sur nom -> modale
+  var btns = cont.querySelectorAll('[data-open-pooler]');
+  for (var j=0; j<btns.length; j++) {
+    (function(b){
+      b.onclick = function(){ openPoolerModal(b.getAttribute('data-open-pooler')); };
+    })(btns[j]);
+  }
 }
-
 function compactLeaderboardHeadersIfSmall(){
   const isVerySmall = window.matchMedia && window.matchMedia('(max-width: 420px)').matches;
   const tbl = document.querySelector('.leaderboard-table thead tr');
@@ -1426,46 +1445,6 @@ function compactLeaderboardHeadersIfSmall(){
 // =====================================================
 // CLASSEMENT – total + points "aujourd'hui" + "hier"
 // =====================================================
-function computeScoresWithDaily() {
-  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
-  var poolers = (state && state.poolers && state.poolers.length ? state.poolers : []);
-  var statsByPlayer = (state && state.stats) ? state.stats : {};
-  var d = getTodayAndYesterday();
-  var out = [];
-
-  for (var i=0; i<poolers.length; i++) {
-    var pl = poolers[i]; if (!pl || !pl.name) continue;
-    var roster = Array.isArray(pl.players) ? pl.players : [];
-    var total = 0, todayPts = 0, yestPts = 0;
-
-    for (var j=0; j<roster.length; j++) {
-      var name = roster[j];
-      var days = statsByPlayer[name] || {};
-      var keys = Object.keys(days);
-
-      for (var k=0; k<keys.length; k++) {
-        var v = days[keys[k]] || {};
-        var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
-        total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
-      }
-
-      if (days[d.todayStr]) {
-        var vt = days[d.todayStr];
-        todayPts += Number(vt.goals||0)*s.goal + Number(vt.assists||0)*s.assist + Number(vt.win||0)*s.goalie_win + Number(vt.otl||0)*s.goalie_otl + Number(vt.so||0)*s.shutout;
-      }
-      if (days[d.yesterdayStr]) {
-        var vy = days[d.yesterdayStr];
-        yestPts += Number(vy.goals||0)*s.goal + Number(vy.assists||0)*s.assist + Number(vy.win||0)*s.goalie_win + Number(vy.otl||0)*s.goalie_otl + Number(vy.so||0)*s.shutout;
-      }
-    }
-
-    out.push({ pooler: pl.name, points: total, today: todayPts, yest: yestPts, rosterCount: roster.length });
-  }
-
-  out.sort(function(a,b){ return (b.points - a.points) || a.pooler.localeCompare(b.pooler); });
-  return out;
-}
-
 
 // Exposer en console si utile
 window.computeScoresWithDaily = computeScoresWithDaily;
