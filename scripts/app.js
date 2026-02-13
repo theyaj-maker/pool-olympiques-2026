@@ -1294,45 +1294,6 @@ function getTodayAndYesterday() {
   return { todayStr: todayStr, yesterdayStr: yesterdayStr };
 }
 
-function computeScoresWithDaily() {
-  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
-  var poolers = (state && state.poolers && state.poolers.length ? state.poolers : []);
-  var statsByPlayer = (state && state.stats) ? state.stats : {};
-  var d = getTodayAndYesterday();
-  var out = [];
-
-  for (var i=0; i<poolers.length; i++) {
-    var pl = poolers[i]; if (!pl || !pl.name) continue;
-    var roster = Array.isArray(pl.players) ? pl.players : [];
-    var total = 0, todayPts = 0, yestPts = 0;
-
-    for (var j=0; j<roster.length; j++) {
-      var name = roster[j];
-      var days = statsByPlayer[name] || {};
-      var keys = Object.keys(days);
-
-      for (var k=0; k<keys.length; k++) {
-        var v = days[keys[k]] || {};
-        var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
-        total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
-      }
-
-      if (days[d.todayStr]) {
-        var vt = days[d.todayStr];
-        todayPts += Number(vt.goals||0)*s.goal + Number(vt.assists||0)*s.assist + Number(vt.win||0)*s.goalie_win + Number(vt.otl||0)*s.goalie_otl + Number(vt.so||0)*s.shutout;
-      }
-      if (days[d.yesterdayStr]) {
-        var vy = days[d.yesterdayStr];
-        yestPts += Number(vy.goals||0)*s.goal + Number(vy.assists||0)*s.assist + Number(vy.win||0)*s.goalie_win + Number(vy.otl||0)*s.goalie_otl + Number(vy.so||0)*s.shutout;
-      }
-    }
-
-    out.push({ pooler: pl.name, points: total, today: todayPts, yest: yestPts, rosterCount: roster.length });
-  }
-
-  out.sort(function(a,b){ return (b.points - a.points) || a.pooler.localeCompare(b.pooler); });
-  return out;
-}
 
 function computeScores() {
   const s = state && state.scoring
@@ -1466,72 +1427,45 @@ function compactLeaderboardHeadersIfSmall(){
 // CLASSEMENT – total + points "aujourd'hui" + "hier"
 // =====================================================
 function computeScoresWithDaily() {
-  const s = state && state.scoring
-    ? state.scoring
-    : { goal: 1, assist: 1, goalie_win: 2, goalie_otl: 1, shutout: 3 };
+  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  var poolers = (state && state.poolers && state.poolers.length ? state.poolers : []);
+  var statsByPlayer = (state && state.stats) ? state.stats : {};
+  var d = getTodayAndYesterday();
+  var out = [];
 
-  const poolers = Array.isArray(state?.poolers) ? state.poolers : [];
-  const statsByPlayer = state?.stats || {};
-  const { todayStr, yesterdayStr } = getTodayAndYesterday();
+  for (var i=0; i<poolers.length; i++) {
+    var pl = poolers[i]; if (!pl || !pl.name) continue;
+    var roster = Array.isArray(pl.players) ? pl.players : [];
+    var total = 0, todayPts = 0, yestPts = 0;
 
-  const out = [];
+    for (var j=0; j<roster.length; j++) {
+      var name = roster[j];
+      var days = statsByPlayer[name] || {};
+      var keys = Object.keys(days);
 
-  poolers
-    .filter(pl => pl && pl.name)
-    .forEach(pl => {
-      const roster = Array.isArray(pl.players) ? pl.players.filter(Boolean) : [];
+      for (var k=0; k<keys.length; k++) {
+        var v = days[keys[k]] || {};
+        var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
+        total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+      }
 
-      let total = 0;
-      let todayPts = 0;
-      let yestPts = 0;
+      if (days[d.todayStr]) {
+        var vt = days[d.todayStr];
+        todayPts += Number(vt.goals||0)*s.goal + Number(vt.assists||0)*s.assist + Number(vt.win||0)*s.goalie_win + Number(vt.otl||0)*s.goalie_otl + Number(vt.so||0)*s.shutout;
+      }
+      if (days[d.yesterdayStr]) {
+        var vy = days[d.yesterdayStr];
+        yestPts += Number(vy.goals||0)*s.goal + Number(vy.assists||0)*s.assist + Number(vy.win||0)*s.goalie_win + Number(vy.otl||0)*s.goalie_otl + Number(vy.so||0)*s.shutout;
+      }
+    }
 
-      roster.forEach(name => {
-        const days = statsByPlayer[name] || {};
-        // total (toutes dates)
-        Object.values(days).forEach(v => {
-          const gg = Number(v?.goals   || 0);
-          const aa = Number(v?.assists || 0);
-          const ww = Number(v?.win     || 0);
-          const oo = Number(v?.otl     || 0);
-          const ss = Number(v?.so      || 0);
-          total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
-        });
-        // aujourd'hui
-        if (days[todayStr]) {
-          const v = days[todayStr];
-          const gg = Number(v?.goals   || 0);
-          const aa = Number(v?.assists || 0);
-          const ww = Number(v?.win     || 0);
-          const oo = Number(v?.otl     || 0);
-          const ss = Number(v?.so      || 0);
-          todayPts += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
-        }
-        // hier
-        if (days[yesterdayStr]) {
-          const v = days[yesterdayStr];
-          const gg = Number(v?.goals   || 0);
-          const aa = Number(v?.assists || 0);
-          const ww = Number(v?.win     || 0);
-          const oo = Number(v?.otl     || 0);
-          const ss = Number(v?.so      || 0);
-          yestPts += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
-        }
-      });
+    out.push({ pooler: pl.name, points: total, today: todayPts, yest: yestPts, rosterCount: roster.length });
+  }
 
-      out.push({
-        pooler: pl.name,
-        points: Number.isFinite(total) ? total : 0,
-        today:  Number.isFinite(todayPts) ? todayPts : 0,
-        yest:   Number.isFinite(yestPts) ? yestPts : 0,
-        rosterCount: roster.length
-      });
-    });
-
-  // tri: points desc puis nom asc
-  out.sort((a, b) => (b.points - a.points) || a.pooler.localeCompare(b.pooler));
-
+  out.sort(function(a,b){ return (b.points - a.points) || a.pooler.localeCompare(b.pooler); });
   return out;
 }
+
 
 // Exposer en console si utile
 window.computeScoresWithDaily = computeScoresWithDaily;
