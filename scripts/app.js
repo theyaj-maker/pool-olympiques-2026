@@ -209,8 +209,10 @@ function setRemoteSources(s){
 
 // Option "bootstrap par URL" : ?poolers=...&rosters=...&stats=...
 function takeRemoteFromURL(){
-  const raw = location.href.replaceAll('&amp;', '&'); // <-- normalise les &amp;
+  // 1) Certains liens collent des &amp; -> remplace par de vrais &
+  const raw = location.href.replaceAll('&amp;', '&');
   const u = new URL(raw);
+
   const src = getRemoteSources();
   let changed = false;
   for (const k of ['poolers','rosters','stats']) {
@@ -220,72 +222,120 @@ function takeRemoteFromURL(){
   if (changed) setRemoteSources(src);
 }
 
+
 async function fetchTextNoCache(url){
-  if(!url) return '';
-  const r = await fetch(url, { cache:'no-store' });
-  if(!r.ok) throw new Error(`HTTP ${r.status} sur ${url}`);
+  if (!url) return '';
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${url}`);
   return await r.text();
+}
+
+// Rosters CSV: pooler,player[,position,team,box] — position/team/box facultatifs
+async function loadRostersFromCSV(url){
+  if (!url) return;
+  const text = await fetchTextNoCache(url);
+  const rows = CSV.parse(text);
+  if (!rows.length) throw new Error('Rosters CSV vide');
+
+  const header = rows.shift().map(h => h.toLowerCase().trim());
+  const idx = {
+    pooler:   header.indexOf('pooler'),
+    player:   header.indexOf('player'),
+    position: header.indexOf('position'),
+    team:     header.indexOf('team'),
+    box:      header.indexOf('box')
+  };
+  if (idx.pooler < 0 || idx.player < 0) {
+    throw new Error('Rosters CSV: en-têtes requis = pooler,player');
+  }
+
+  // Table par nom de pooler (lowercased)
+  const map = Object.create(null);
+  (state.poolers || []).forEach(p => map[p.name.toLowerCase()] = p);
+
+  // Reset du roster (on suit le CSV rosters comme vérité)
+  Object.values(map).forEach(p => p.players = []);
+
+  rows.forEach(r => {
+    const poolerName = (r[idx.pooler] || '').toString().trim();
+    const playerName = (r[idx.player] || '').toString().trim();
+    if (!poolerName || !playerName) return;
+
+    const pl = map[poolerName.toLowerCase()];
+    if (!pl) return; // le pooler doit exister
+
+    // Si position/team/box fournis -> enrichit la liste maîtresse
+    if (idx.position >= 0 || idx.team >= 0 || idx.box >= 0) {
+      const posRaw = ((idx.position>=0 ? (r[idx.position]||'') : '')).toString().trim().toUpperCase();
+      const posN   = posRaw.startsWith('G') ? 'G' : (posRaw.startsWith('D') ? 'D' : 'F');
+      const team   = ((idx.team>=0 ? (r[idx.team]||'') : '')).toString().trim().toUpperCase();
+      const bxRaw  = ((idx.box>=0 ? (r[idx.box]||'')  : '')).toString().trim().toUpperCase();
+      const box    = /^(B([1-9]|10)|G1|G2|BONUS)$/.test(bxRaw) ? bxRaw : '';
+
+      const exist = state.players.find(x => x.name.toLowerCase() === playerName.toLowerCase());
+      if (!exist) state.players.push({ name: playerName, position: posN, team, box });
+    }
+
+    if (!pl.players.includes(playerName)) pl.players.push(playerName);
+  });
+
+  State.save(state);
+  renderPoolers();
+  renderRosterView();
+  refreshPlayersDatalist();
+  computeAndRender();
 }
 
 // Poolers CSV attendu : pooler,skaters,goalies
 async function loadPoolersFromCSV(url){
-  if(!url) return;
+  if (!url) return;
   const text = await fetchTextNoCache(url);
-  if(!text) throw new Error('Poolers CSV vide');
-
   const rows = CSV.parse(text);
-  if(!rows.length) throw new Error('Poolers CSV: aucune ligne');
+  if (!rows.length) throw new Error('Poolers CSV vide');
 
-  const header = rows.shift().map(h=>h.toLowerCase().trim());
+  const header = rows.shift().map(h => h.toLowerCase().trim());
   const idx = {
-    pooler: header.indexOf('pooler'),
+    pooler:  header.indexOf('pooler'),
     skaters: header.indexOf('skaters'),
-    goalies: header.indexOf('goalies'),
+    goalies: header.indexOf('goalies')
   };
-  if(idx.pooler<0 || idx.skaters<0 || idx.goalies<0){
+  if (idx.pooler < 0 || idx.skaters < 0 || idx.goalies < 0) {
     throw new Error('Poolers CSV: en-têtes requis = pooler,skaters,goalies');
   }
 
-  // On préserve les rosters existants (si Rosters CSV non fourni)
   const byName = Object.create(null);
-  state.poolers.forEach(p=> byName[p.name.toLowerCase()] = p);
+  (state.poolers || []).forEach(p => byName[p.name.toLowerCase()] = p);
 
-  const newPoolers = [];
-  rows.forEach(r=>{
-    const name = (r[idx.pooler]||'').toString().trim();
-    if(!name) return;
-    const sk = parseInt(r[idx.skaters]||'15',10) || 15;
-    const go = parseInt(r[idx.goalies]||'2',10) || 2;
-
-    const existing = byName[name.toLowerCase()];
-    newPoolers.push({
-      name,
-      roster: { skaters: sk, goalies: go },
-      players: existing ? (existing.players||[]) : [] // roster conservé tant que Rosters CSV n’écrase pas
-    });
+  const list = [];
+  rows.forEach(r => {
+    const name = (r[idx.pooler] || '').toString().trim();
+    if (!name) return;
+    const sk = parseInt(r[idx.skaters] || '15', 10) || 15;
+    const go = parseInt(r[idx.goalies] || '2', 10) || 2;
+    const ex = byName[name.toLowerCase()];
+    list.push({ name, roster:{skaters:sk, goalies:go}, players: ex ? (ex.players || []) : [] });
   });
 
-  state.poolers = newPoolers;
+  state.poolers = list;
   State.save(state);
-  renderPoolers(); refreshDraftPooler(); renderRosterView();computeAndRender();
+  renderPoolers();
+  refreshDraftPooler();
+  renderRosterView();
+  computeAndRender();
 }
 
 async function refreshAllRemote(){
   const src = getRemoteSources();
   const ops = [];
 
-  if(src.poolersUrl){
-    ops.push(loadPoolersFromCSV(src.poolersUrl).catch(e=>console.warn('Poolers CSV:', e.message||e)));
-  }
-  if(src.rostersUrl){
-    ops.push(loadRostersFromCSV(src.rostersUrl).catch(e=>console.warn('Rosters CSV:', e.message||e)));
-  }
+  if (src.poolersUrl) ops.push(loadPoolersFromCSV(src.poolersUrl).catch(e => console.warn('Poolers CSV:', e.message||e)));
+  if (src.rostersUrl) ops.push(loadRostersFromCSV(src.rostersUrl).catch(e => console.warn('Rosters CSV:', e.message||e)));
 
-  // Stats : si tu veux forcer la même logique dans un seul bouton
-  const statsUrlEl = document.getElementById('stats-url');
-  const statsUrl = (statsUrlEl && statsUrlEl.value) ? statsUrlEl.value.trim() : (src.statsUrl||'');
-  if(statsUrl){
-    ops.push(fetchTextNoCache(statsUrl).then(ingestStatsFromCSVText).catch(e=>console.warn('Stats CSV:', e.message||e)));
+  // Stats : depuis l’input si présent, sinon depuis la source mémorisée
+  const statsEl = document.getElementById('stats-url');
+  const statsUrl = (statsEl && statsEl.value) ? statsEl.value.trim() : (src.statsUrl || '');
+  if (statsUrl) {
+    ops.push(fetchTextNoCache(statsUrl).then(ingestStatsFromCSVText).catch(e => console.warn('Stats CSV:', e.message||e)));
   }
 
   await Promise.all(ops);
