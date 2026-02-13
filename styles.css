@@ -129,3 +129,9 @@ dialog .table tr:nth-child(even),
 .leaderboard-table td:nth-child(3) {
   padding-right: 10px;
 }
+
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  border-right: 2px solid #2c3e70;
+}
+
