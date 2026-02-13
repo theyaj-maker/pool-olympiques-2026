@@ -5,6 +5,24 @@ import { State } from './state.js';
 import { CSV }   from './csv.js';
 import { Adapters } from './adapters.js';
 
+// --- SafeStorage: localStorage -> sessionStorage -> in-memory ---
+const SafeStorage = (function(){
+  var mem = {};
+  function hasLocal(){
+    try { var k='__t'; localStorage.setItem(k,'1'); localStorage.removeItem(k); return true; } catch(e){ return false; }
+  }
+  function hasSession(){
+    try { var k='__t'; sessionStorage.setItem(k,'1'); sessionStorage.removeItem(k); return true; } catch(e){ return false; }
+  }
+  var backend = hasLocal() ? localStorage : (hasSession() ? sessionStorage : null);
+  return {
+    getItem: function(k){ try { return backend ? backend.getItem(k) : (mem.hasOwnProperty(k)? mem[k] : null); } catch(e){ return mem.hasOwnProperty(k)? mem[k] : null; } },
+    setItem: function(k,v){ try { if (backend) backend.setItem(k,v); else mem[k]=v; } catch(e){ mem[k]=v; } },
+    removeItem: function(k){ try { if (backend) backend.removeItem(k); else delete mem[k]; } catch(e){ delete mem[k]; } },
+    type: backend === localStorage ? 'localStorage' : (backend === sessionStorage ? 'sessionStorage' : 'memory')
+  };
+})();
+
 // Petit utilitaire DOM facultatif (si tu veux)
 const qs = (sel) => document.querySelector(sel);
 
@@ -111,14 +129,13 @@ async function verifyToken(token) {
 
 // 7) Stockage local (non sensible) du statut d’accès
 function setAuth(role, payload, token) {
-  localStorage.setItem('pool-auth', JSON.stringify({ role, payload, token }));
+  SafeStorage.setItem('pool-auth', JSON.stringify({ role, payload, token }));
 }
 function getAuth() {
-  try { return JSON.parse(localStorage.getItem('pool-auth')); }
-  catch { return null; }
+  try { return JSON.parse(SafeStorage.getItem('pool-auth')); } catch { return null; }
 }
 function clearAuth() {
-  localStorage.removeItem('pool-auth');
+  SafeStorage.removeItem('pool-auth');
 }
 
 // 8) Appliquer l’accès (affiche/masque portail et blocs admin)
@@ -247,24 +264,36 @@ const REMOTE_KEY = 'pool-remote-sources';
 
 
 function getRemoteSources(){
-  try { const raw = localStorage.getItem('pool-remote-sources'); if (raw) return JSON.parse(raw); }
-  catch(_) {}
+  try { var raw = SafeStorage.getItem('pool-remote-sources'); if (raw) return JSON.parse(raw); } catch(_){}
   return { playersUrl:'', poolersUrl:'', statsUrl:'' };
 }
 function setRemoteSources(s){
-  localStorage.setItem('pool-remote-sources', JSON.stringify(s));
+  SafeStorage.setItem('pool-remote-sources', JSON.stringify(s));
 }
 
 function takeRemoteFromURL(){
-  // Convertit &amp; -> & avant parsing (liens collés depuis HTML)
-  const raw = location.href.replaceAll('&amp;', '&');
-  const u = new URL(raw);
-  const src = getRemoteSources();
-  let changed = false;
+  var raw = location.href.replaceAll('&amp;', '&'); // normalise
+  var u = new URL(raw);
+  var src = getRemoteSources();
+  var changed = false;
 
-  const P = u.searchParams.get('players');
-  const L = u.searchParams.get('poolers');
-  const S = u.searchParams.get('stats');
+  function pick(key){
+    var std = u.searchParams.get(key) || '';
+    if (std && (std.includes('gid=') || std.includes('tqx=out:csv'))) return std;
+    // fallback brut si non-encodé
+    var i = raw.indexOf(key + '=');
+    if (i < 0) return std;
+    var start = i + key.length + 1;
+    var stops = ['&players=','&poolers=','&stats=','&token=','#'];
+    var end = raw.length;
+    for (var s of stops){ var j = raw.indexOf(s, start); if (j >= 0 && j < end) end = j; }
+    var slice = raw.slice(start, end);
+    try { return decodeURIComponent(slice); } catch { return slice; }
+  }
+
+  var P = pick('players');
+  var L = pick('poolers');
+  var S = pick('stats');
 
   if (P && src.playersUrl !== P) { src.playersUrl = P; changed = true; }
   if (L && src.poolersUrl !== L) { src.poolersUrl = L; changed = true; }
@@ -272,7 +301,6 @@ function takeRemoteFromURL(){
 
   if (changed) setRemoteSources(src);
 }
-
 
 
 async function fetchTextNoCache(url){
@@ -1653,7 +1681,16 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
   cont.innerHTML = '';
   cont.appendChild(table);
 }
-
+function openDialogSafe(dlg){
+  if (!dlg) return;
+  if (typeof dlg.showModal === 'function') dlg.showModal();
+  else dlg.setAttribute('open',''); // fallback simple
+}
+function closeDialogSafe(dlg){
+  if (!dlg) return;
+  if (typeof dlg.close === 'function') dlg.close();
+  else dlg.removeAttribute('open');
+}
 function openPoolerModal(poolerName) {
   const dlg = document.getElementById('pooler-modal');
   if (!dlg) return;
@@ -1684,9 +1721,9 @@ function openPoolerModal(poolerName) {
       renderPoolerPlayersTable(poolerName, f, t);
     };
   }
-  if (btnClose) btnClose.onclick = function () { dlg.close(); };
+  if (btnClose) btnClose.onclick = function () { closeDialogSafe(dlg); };
 
-  dlg.showModal();
+  openDialogSafe(dlg);
 }
 
 function init(){
