@@ -243,10 +243,30 @@ function safeFixed(v, d = 1) {
   return Number.isFinite(n) ? n.toFixed(d) : (0).toFixed(d);
 }
 
+// Active/désactive les cartes mobile (peut être mis à false si besoin de rollback rapide)
+var SAFE_MOBILE_CARDS = true;
+
 function isMobile() {
   var w = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1024;
-  var docW = (typeof document !== 'undefined' && document.documentElement && document.documentElement.clientWidth) ? document.documentElement.clientWidth : w;
-  return (w || docW) <= 768;
+  var dw = (document.documentElement && document.documentElement.clientWidth) ? document.documentElement.clientWidth : w;
+  return ((w || dw) <= 768);
+}
+
+function showLeaderboardMode(mode){
+  var tbl  = document.getElementById('leaderboard');
+  var cards= document.getElementById('leaderboard-cards');
+  if (!tbl || !cards) return;
+  if (mode === 'cards') { tbl.style.display = 'none'; cards.style.display = 'block'; }
+  else                  { tbl.style.display = '';     cards.style.display = 'none'; }
+}
+
+function showModalListsMode(mode){
+  var pt = document.getElementById('pooler-players-table');
+  var pc = document.getElementById('pooler-players-cards');
+  var dt = document.getElementById('pooler-daily-table');
+  var dc = document.getElementById('pooler-daily-cards');
+  if (pt && pc) { pt.style.display = (mode==='cards'?'none':''); pc.style.display = (mode==='cards'?'block':'none'); }
+  if (dt && dc) { dt.style.display = (mode==='cards'?'none':''); dc.style.display = (mode==='cards'?'block':'none'); }
 }
 
 // ---------- Compte les "matchs joués" (1 ligne de stats = 1 match) ----------
@@ -1440,7 +1460,56 @@ function compactLeaderboardHeadersIfSmall(){
     ths[4].textContent = 'Points aujourd’hui';
   }
 }
+function renderLeaderboardCardsMobile() {
+  if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
 
+  var host = document.getElementById('leaderboard-cards');
+  var tblHost = document.getElementById('leaderboard');
+  if (!host || !tblHost) return;
+
+  host.innerHTML = '';
+
+  var totals = [];
+  try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
+
+  // Rendre les cartes
+  if (!totals.length) {
+    host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
+  } else {
+    for (var i=0; i<totals.length; i++) {
+      var r = totals[i];
+      var card = document.createElement('div');
+      card.className = 'lb-card';
+      card.innerHTML =
+        '<div class="lb-head">' +
+          '<div class="lb-rank">'+ (i+1) +'</div>' +
+          '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
+          '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
+        '</div>' +
+        '<div class="lb-sub">' +
+          '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
+          '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
+        '</div>';
+      host.appendChild(card);
+    }
+  }
+
+  // Si on a bien quelque chose, on bascule en mode cartes
+  if (host.children.length > 0) {
+    showLeaderboardMode('cards');
+  } else {
+    // Sécurité : on garde le tableau
+    showLeaderboardMode('table');
+  }
+
+  // Clic -> modale
+  var btns = host.querySelectorAll('[data-open-pooler]');
+  for (var j=0; j<btns.length; j++) {
+    (function(b){
+      b.onclick = function(){ openPoolerModal(b.getAttribute('data-open-pooler')); };
+    })(btns[j]);
+  }
+}
 
 // =====================================================
 // CLASSEMENT – total + points "aujourd'hui" + "hier"
@@ -1729,59 +1798,66 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
 }
 
 function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
+  if (!SAFE_MOBILE_CARDS || !isMobile()) { showModalListsMode('table'); return; }
+
   var host = document.getElementById('pooler-players-cards');
   if (!host) return;
-
-  if (!isMobile()) { host.style.display = 'none'; host.innerHTML = ''; return; }
-  host.style.display = 'grid';
   host.innerHTML = '';
 
   var rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || []);
-  for (var i=0; i<rows.length; i++) {
-    var r = rows[i];
-    var mj = countMatches(r.name, fromStr, toStr);
-    var c = document.createElement('div');
-    c.className = 'pl-card';
-    c.innerHTML =
-      '<div class="pl-head">' +
-        '<div class="pl-name">'+ r.name +'</div>' +
-        '<div class="pl-meta">'+ (r.position||'') + (r.team ? ' · ' + r.team : '') +'</div>' +
-      '</div>' +
-      '<div class="pl-stats">' +
-        '<div class="stat"><span class="v">'+ (mj||0) +'</span>MJ</div>' +
-        '<div class="stat"><span class="v">'+ (r.goals||0) +'</span>Buts</div>' +
-        '<div class="stat"><span class="v">'+ (r.assists||0) +'</span>Passes</div>' +
-        '<div class="stat"><span class="v">'+ (r.win||0) +'</span>Win</div>' +
-        '<div class="stat"><span class="v">'+ (r.otl||0) +'</span>OTL</div>' +
-        '<div class="stat"><span class="v">'+ (r.so||0) +'</span>SO</div>' +
-        '<div class="stat" style="grid-column: span 3;"><span class="v">'+ Number(r.points||0).toFixed(1) +'</span>Points</div>' +
-      '</div>' +
-      '<div class="actions" style="margin-top:8px;"><button class="secondary" data-open-player="'+ r.name +'">Voir le détail</button></div>';
-    host.appendChild(c);
+  if (!rows.length) {
+    host.innerHTML = '<div class="pl-card"><em>Aucun joueur dans la période.</em></div>';
+  } else {
+    for (var i=0; i<rows.length; i++) {
+      var r = rows[i];
+      var mj = countMatches(r.name, fromStr, toStr);
+      var c = document.createElement('div');
+      c.className = 'pl-card';
+      c.innerHTML =
+        '<div class="pl-head">' +
+          '<div class="pl-name">'+ r.name +'</div>' +
+          '<div class="pl-meta">'+ (r.position||'') + (r.team ? ' · ' + r.team : '') +'</div>' +
+        '</div>' +
+        '<div class="pl-stats">' +
+          '<div class="stat"><span class="v">'+ (mj||0) +'</span>MJ</div>' +
+          '<div class="stat"><span class="v">'+ (r.goals||0) +'</span>Buts</div>' +
+          '<div class="stat"><span class="v">'+ (r.assists||0) +'</span>Passes</div>' +
+          '<div class="stat"><span class="v">'+ (r.win||0) +'</span>Win</div>' +
+          '<div class="stat"><span class="v">'+ (r.otl||0) +'</span>OTL</div>' +
+          '<div class="stat"><span class="v">'+ (r.so||0) +'</span>SO</div>' +
+          '<div class="stat" style="grid-column: span 3;"><span class="v">'+ Number(r.points||0).toFixed(1) +'</span>Points</div>' +
+        '</div>' +
+        '<div class="actions" style="margin-top:8px;"><button class="secondary" data-open-player="'+ r.name +'">Voir le détail</button></div>';
+      host.appendChild(c);
+    }
   }
 
+  if (host.children.length > 0) showModalListsMode('cards');
+
+  // Détail quotidien (cartes)
   var btns = host.querySelectorAll('[data-open-player]');
   for (var j=0; j<btns.length; j++) {
-    (function(btn){
-      btn.onclick = function(){
-        var name = btn.getAttribute('data-open-player');
-        var fromEl = document.getElementById('pooler-from');
-        var toEl   = document.getElementById('pooler-to');
-        var from = fromEl ? fromEl.value : '';
-        var to   = toEl   ? toEl.value   : '';
-        renderPoolerDailyCards(poolerName, name, from, to);
+    (function(b){
+      b.onclick = function(){
+        var name = b.getAttribute('data-open-player');
+        var fEl = document.getElementById('pooler-from');
+        var tEl = document.getElementById('pooler-to');
+        var f = fEl ? fEl.value : '';
+        var t = tEl ? tEl.value : '';
+        renderPoolerDailyCards(poolerName, name, f, t);
       };
     })(btns[j]);
   }
 }
+
 function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
+  if (!SAFE_MOBILE_CARDS || !isMobile()) { showModalListsMode('table'); return; }
+
   var host = document.getElementById('pooler-daily-cards');
   var title = document.getElementById('pooler-daily-title');
   if (!host || !title) return;
-
-  if (!isMobile()) { host.style.display = 'none'; host.innerHTML=''; title.style.display='none'; return; }
-  host.style.display = 'grid';
   host.innerHTML = '';
+
   title.textContent = 'Détail par date — ' + playerName;
   title.style.display = '';
 
@@ -1793,7 +1869,6 @@ function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
 
   var keys = Object.keys(days).sort();
   var any = false;
-
   for (var i=0; i<keys.length; i++) {
     var d = keys[i];
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
@@ -1821,10 +1896,7 @@ function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
       '</div>';
     host.appendChild(c);
   }
-
-  if (!any) {
-    host.innerHTML = '<div class="day-card"><em>Aucune donnée dans la période.</em></div>';
-  }
+  if (!any) host.innerHTML = '<div class="day-card"><em>Aucune donnée dans la période.</em></div>';
 }
 
 function openDialogSafe(dlg){
