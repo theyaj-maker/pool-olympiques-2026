@@ -691,24 +691,24 @@ function bindScoring(){
 // --- Players master ---
 function renderPlayers(filter = '') {
   const cont = document.getElementById('players-list');
-  if (!cont) return; // ← TOLÉRANT : si la section n'existe pas, on sort
+  if (!cont) return;
+
+  // Pas de zébrage sur cette zone si tu veux
+  cont.classList.add('no-zebra');
 
   const players = (state.players || [])
-    .filter(p => `${p.name} ${p.team} ${p.position} ${p.box || ''}`
-      .toLowerCase().includes((filter || '').toLowerCase()))
+    .filter(p => `${p.name} ${p.team} ${p.position} ${p.box || ''}`.toLowerCase().includes((filter || '').toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const table = document.createElement('table');
+  table.classList.add('table');
   table.innerHTML = `
     <thead>
       <tr>
-        <th>Nom</th>
-        <th>Pos</th>
-        <th>Équipe</th>
-        <th>Boîte</th>
-        <th></th>
+        <th>Nom</th><th>Pos</th><th>Équipe</th><th>Boîte</th><th class="only-manager"></th>
       </tr>
     </thead>`;
+
   const tbody = document.createElement('tbody');
 
   players.forEach(p => {
@@ -718,15 +718,17 @@ function renderPlayers(filter = '') {
       <td>${p.position}</td>
       <td>${p.team || ''}</td>
       <td>${p.box || ''}</td>`;
+
     const td = document.createElement('td');
     const del = document.createElement('button');
-    del.className = 'secondary';
+    del.className = 'secondary only-manager';       // ⬅️ important
     del.textContent = 'Supprimer';
     del.onclick = () => {
       state.players = state.players.filter(x => x !== p);
       State.save(state);
       renderPlayers(filter);
-      refreshPlayersDatalist();
+      refreshPlayersDatalist?.();
+      renderBoxDraftUI?.();
     };
     td.appendChild(del);
     tr.appendChild(td);
