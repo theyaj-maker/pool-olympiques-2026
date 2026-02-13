@@ -125,8 +125,6 @@ function clearAuth() {
 function applyAccessControls() {
   const auth = getAuth();
   const role = auth?.role || 'viewer';
-
-  // Rôle au niveau du <body> pour permettre un ciblage CSS simple
   document.body.setAttribute('data-role', role);
 
   const app  = document.getElementById('app-root');
@@ -139,6 +137,12 @@ function applyAccessControls() {
   document.querySelectorAll('[data-role="manager-only"]').forEach(el => {
     el.style.display = (role === 'manager') ? '' : 'none';
   });
+
+  // Barre client & badge visibles après auth
+  const badge = document.getElementById('status-badge');
+  const bar   = document.getElementById('client-toolbar');
+  if (badge) badge.hidden = !auth;
+  if (bar)   bar.hidden   = !auth;
 }
 
 // 9) Essayer ?token=... ou #token=...
@@ -183,6 +187,25 @@ function bindGateUI() {
     };
   }
 }
+function setStatus(level='ok', text=''){
+  const badge = document.getElementById('status-badge');
+  if (!badge) return;
+  badge.hidden = false;
+  badge.classList.remove('ok','warn','err');
+  badge.classList.add(level);
+  badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text}</span>`;
+}
+function setStatusOK(summary){
+  const ts = new Date().toLocaleTimeString();
+  setStatus('ok', `Synchro OK — ${summary} · ${ts}`);
+}
+function setStatusWarn(msg='Synchronisation en cours…'){
+  setStatus('warn', msg);
+}
+function setStatusErr(msg='Erreur de synchronisation'){
+  setStatus('err', msg);
+}
+
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
  *  - Poolers : pooler,skaters,goalies
@@ -1385,15 +1408,38 @@ if (recomputeBtn) {
   
 
 // 4) auto‑refresh pour TOUS (viewer + manager)
-  const autoLabel = document.getElementById('auto-refresh')?.closest('label');
-  if (autoLabel) autoLabel.style.display = 'none';
-  setInterval(() => {
-    refreshAllRemote()
-      .then(() => computeAndRender())
-      .catch(console.warn);
-  }, REFRESH_INTERVAL_MS);
+  setInterval(async () => {
+  try {
+    setStatusWarn('Synchronisation automatique…');
+    await refreshAllRemote();
+    const p = (state.players||[]).length;
+    const pl = (state.poolers||[]).length;
+    const sp = Object.keys(state.stats||{}).length;
+    setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats joueurs: ${sp}`);
+    computeAndRender();
+  } catch(e) {
+    console.warn('auto-refresh error:', e);
+    setStatusErr('Erreur de synchronisation (auto)');
+  }
+}, REFRESH_INTERVAL_MS);
 
-
+const clientRefreshBtn = document.getElementById('client-refresh');
+if (clientRefreshBtn) {
+  clientRefreshBtn.onclick = async () => {
+    try {
+      setStatusWarn('Rafraîchissement…');
+      await refreshAllRemote();
+      const p = (state.players||[]).length;
+      const pl = (state.poolers||[]).length;
+      const sp = Object.keys(state.stats||{}).length;
+      setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats joueurs: ${sp}`);
+      computeAndRender();
+    } catch(e) {
+      console.warn('client refresh error:', e);
+      setStatusErr('Erreur durant le rafraîchissement');
+    }
+  };
+}
 
 }
 
