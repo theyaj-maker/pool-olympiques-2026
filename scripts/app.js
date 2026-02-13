@@ -1402,11 +1402,11 @@ function compactLeaderboardHeadersIfSmall(){
 
   // th[2] = Points total, th[3] = Points hier, th[4] = Points aujourd’hui
   if (isVerySmall) {
-    ths[2].innerHTML = '🥇 Pts total';
+    ths[2].innerHTML = 'Pts total';
     ths[3].textContent = 'Pts hier';
     ths[4].textContent = 'Pts ajd';     // “aujourd’hui” abrégé
   } else {
-    ths[2].innerHTML = '🥇 Points total';
+    ths[2].innerHTML = 'Points total';
     ths[3].textContent = 'Points hier';
     ths[4].textContent = 'Points aujourd’hui';
   }
