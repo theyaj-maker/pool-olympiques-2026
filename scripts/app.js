@@ -1814,6 +1814,14 @@ if (clientRefreshBtn) {
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
 
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible') {
+    refreshAllRemote()
+      .then(function(){ computeAndRender(); })
+      .catch(console.warn);
+  }
+});
+
 /***** =========================
  *  STATS DES JOUEURS (UI)
  *========================== ***/
