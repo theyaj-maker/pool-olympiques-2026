@@ -160,6 +160,15 @@ function applyAccessControls() {
   const bar   = document.getElementById('client-toolbar');
   if (badge) badge.hidden = !auth;
   if (bar)   bar.hidden   = !auth;
+  // Active la réserve en haut quand le badge est visible
+(function ensureBadgePadding(){
+  const badge = document.getElementById('status-badge');
+  if (!badge) return;
+  // Badge visible => ajoute une classe au body (mobile détectera via CSS)
+  badge.hidden ? document.body.classList.remove('has-status-badge')
+               : document.body.classList.add('has-status-badge');
+})();
+
 }
 
 // 9) Essayer ?token=... ou #token=...
@@ -211,6 +220,7 @@ function setStatus(level='ok', text=''){
   badge.classList.remove('ok','warn','err');
   badge.classList.add(level);
   badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text || ' '}</span>`;
+  document.body.classList.add('has-status-badge');
 }
 function setStatusOK(summary='Synchro OK'){
   const ts = new Date().toLocaleTimeString();
