@@ -209,14 +209,15 @@ function setRemoteSources(s){
 
 // Option "bootstrap par URL" : ?poolers=...&rosters=...&stats=...
 function takeRemoteFromURL(){
-  const u = new URL(location.href);
+  const raw = location.href.replaceAll('&amp;', '&'); // <-- normalise les &amp;
+  const u = new URL(raw);
   const src = getRemoteSources();
   let changed = false;
-  ['poolers','rosters','stats'].forEach(k=>{
+  for (const k of ['poolers','rosters','stats']) {
     const v = u.searchParams.get(k);
-    if(v){ src[k+'Url'] = v; changed = true; }
-  });
-  if(changed) setRemoteSources(src);
+    if (v) { src[k + 'Url'] = v; changed = true; }
+  }
+  if (changed) setRemoteSources(src);
 }
 
 async function fetchTextNoCache(url){
