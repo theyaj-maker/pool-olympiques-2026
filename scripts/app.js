@@ -1816,113 +1816,102 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
 }
 
 function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
-  const host = document.getElementById('pooler-players-cards');
+  var host = document.getElementById('pooler-players-cards');
   if (!host) return;
+
+  if (!isMobile()) { host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.style.display = 'grid';
   host.innerHTML = '';
 
-  if (!isMobile()) { host.style.display = 'none'; return; }
-  host.style.display = 'grid';
-
-  const rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || [])
-    .map(r => Object.assign({}, r, { mj: countMatches(r.name, fromStr, toStr) }));
-
-  if (!rows.length) {
-    host.innerHTML = '<div class="pl-card"><em>Aucun joueur dans la période.</em></div>';
-    return;
+  var rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || []);
+  for (var i=0; i<rows.length; i++) {
+    var r = rows[i];
+    var mj = countMatches(r.name, fromStr, toStr);
+    var c = document.createElement('div');
+    c.className = 'pl-card';
+    c.innerHTML =
+      '<div class="pl-head">' +
+        '<div class="pl-name">'+ r.name +'</div>' +
+        '<div class="pl-meta">'+ (r.position||'') + (r.team ? ' · ' + r.team : '') +'</div>' +
+      '</div>' +
+      '<div class="pl-stats">' +
+        '<div class="stat"><span class="v">'+ (mj||0) +'</span>MJ</div>' +
+        '<div class="stat"><span class="v">'+ (r.goals||0) +'</span>Buts</div>' +
+        '<div class="stat"><span class="v">'+ (r.assists||0) +'</span>Passes</div>' +
+        '<div class="stat"><span class="v">'+ (r.win||0) +'</span>Win</div>' +
+        '<div class="stat"><span class="v">'+ (r.otl||0) +'</span>OTL</div>' +
+        '<div class="stat"><span class="v">'+ (r.so||0) +'</span>SO</div>' +
+        '<div class="stat" style="grid-column: span 3;"><span class="v">'+ Number(r.points||0).toFixed(1) +'</span>Points</div>' +
+      '</div>' +
+      '<div class="actions" style="margin-top:8px;"><button class="secondary" data-open-player="'+ r.name +'">Voir le détail</button></div>';
+    host.appendChild(c);
   }
 
-  rows.forEach(r => {
-    const c = document.createElement('div');
-    c.className = 'pl-card';
-    c.innerHTML = `
-      <div class="pl-head">
-        <div class="pl-name">${r.name}</div>
-        <div class="pl-meta">${r.position || ''} ${r.team ? '· '+r.team : ''}</div>
-      </div>
-      <div class="pl-stats">
-        <div class="stat"><span class="v">${r.mj||0}</span>MJ</div>
-        <div class="stat"><span class="v">${r.goals||0}</span>Buts</div>
-        <div class="stat"><span class="v">${r.assists||0}</span>Passes</div>
-        <div class="stat"><span class="v">${r.win||0}</span>Win</div>
-        <div class="stat"><span class="v">${r.otl||0}</span>OTL</div>
-        <div class="stat"><span class="v">${r.so||0}</span>SO</div>
-        <div class="stat" style="grid-column: span 3;"><span class="v">${Number(r.points||0).toFixed(1)}</span>Points</div>
-      </div>
-      <div class="actions" style="margin-top:8px;">
-        <button class="secondary" data-open-player="${r.name}">Voir le détail</button>
-      </div>
-    `;
-    host.appendChild(c);
-  });
-
-  host.querySelectorAll('[data-open-player]').forEach(btn => {
-    btn.onclick = () => {
-      const name = btn.getAttribute('data-open-player');
-      const from = document.getElementById('pooler-from')?.value || '';
-      const to   = document.getElementById('pooler-to')?.value   || '';
-      renderPoolerDailyCards(poolerName, name, from, to);
-    };
-  });
+  var btns = host.querySelectorAll('[data-open-player]');
+  for (var j=0; j<btns.length; j++) {
+    (function(btn){
+      btn.onclick = function(){
+        var name = btn.getAttribute('data-open-player');
+        var fromEl = document.getElementById('pooler-from');
+        var toEl   = document.getElementById('pooler-to');
+        var from = fromEl ? fromEl.value : '';
+        var to   = toEl   ? toEl.value   : '';
+        renderPoolerDailyCards(poolerName, name, from, to);
+      };
+    })(btns[j]);
+  }
 }
-
 function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
-  const host = document.getElementById('pooler-daily-cards');
-  const title = document.getElementById('pooler-daily-title');
+  var host = document.getElementById('pooler-daily-cards');
+  var title = document.getElementById('pooler-daily-title');
   if (!host || !title) return;
 
-  host.innerHTML = '';
-
-  if (!isMobile()) { host.style.display = 'none'; return; }
+  if (!isMobile()) { host.style.display = 'none'; host.innerHTML=''; title.style.display='none'; return; }
   host.style.display = 'grid';
-
+  host.innerHTML = '';
   title.textContent = 'Détail par date — ' + playerName;
   title.style.display = '';
 
-  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
-  const days = (state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
-  const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
-  const toEff = toStr || new Date().toISOString().slice(0,10);
-  const to = new Date(toEff + 'T23:59:59');
+  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  var days = (state && state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
+  var from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  var toEff = toStr || new Date().toISOString().slice(0,10);
+  var to   = new Date(toEff + 'T23:59:59');
 
-  const list = Object.keys(days)
-    .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    .filter(d => {
-      const dt = new Date(d + 'T12:00:00');
-      if (from && dt < from) return false;
-      if (to   && dt > to)   return false;
-      return true;
-    })
-    .sort()
-    .map(d => {
-      const v = days[d] || {};
-      const gg = Number(v.goals||0), aa = Number(v.assists||0),
-            ww = Number(v.win||0),   oo = Number(v.otl||0), ss = Number(v.so||0);
-      const pts = gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*(s.goalie_otl||0) + ss*s.shutout;
-      const mj  = v.hasOwnProperty('played') ? Number(v.played||0) : 1;
-      return { date:d, mj, goals:gg, assists:aa, win:ww, otl:oo, so:ss, points:pts };
-    });
+  var keys = Object.keys(days).sort();
+  var any = false;
 
-  if (!list.length) {
-    host.innerHTML = '<div class="day-card"><em>Aucune donnée dans la période.</em></div>';
-    return;
+  for (var i=0; i<keys.length; i++) {
+    var d = keys[i];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    var dt = new Date(d + 'T12:00:00');
+    if (from && dt < from) continue;
+    if (to && dt > to) continue;
+
+    any = true;
+    var v = days[d] || {};
+    var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
+    var pts = gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*(s.goalie_otl||0) + ss*s.shutout;
+    var mj  = v.hasOwnProperty('played') ? Number(v.played||0) : 1;
+
+    var c = document.createElement('div');
+    c.className = 'day-card';
+    c.innerHTML =
+      '<div class="day-head"><div>'+ d +'</div><div><strong>'+ pts.toFixed(1) +'</strong> pts</div></div>' +
+      '<div class="day-stats">' +
+        '<div class="stat"><span class="v">'+ mj +'</span>MJ</div>' +
+        '<div class="stat"><span class="v">'+ gg +'</span>Buts</div>' +
+        '<div class="stat"><span class="v">'+ aa +'</span>Passes</div>' +
+        '<div class="stat"><span class="v">'+ ww +'</span>Win</div>' +
+        '<div class="stat"><span class="v">'+ oo +'</span>OTL</div>' +
+        '<div class="stat"><span class="v">'+ ss +'</span>SO</div>' +
+      '</div>';
+    host.appendChild(c);
   }
 
-  list.forEach(r => {
-    const c = document.createElement('div');
-    c.className = 'day-card';
-    c.innerHTML = `
-      <div class="day-head"><div>${r.date}</div><div><strong>${r.points.toFixed(1)}</strong> pts</div></div>
-      <div class="day-stats">
-        <div class="stat"><span class="v">${r.mj}</span>MJ</div>
-        <div class="stat"><span class="v">${r.goals}</span>Buts</div>
-        <div class="stat"><span class="v">${r.assists}</span>Passes</div>
-        <div class="stat"><span class="v">${r.win}</span>Win</div>
-        <div class="stat"><span class="v">${r.otl}</span>OTL</div>
-        <div class="stat"><span class="v">${r.so}</span>SO</div>
-      </div>
-    `;
-    host.appendChild(c);
-  });
+  if (!any) {
+    host.innerHTML = '<div class="day-card"><em>Aucune donnée dans la période.</em></div>';
+  }
 }
 
 function openDialogSafe(dlg){
