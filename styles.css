@@ -341,4 +341,88 @@ button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
     padding-top: 56px;   /* ajuste si besoin selon la taille du badge */
   }
 }
-``
+
+/* =========================================
+   CLASSEMENT — mode compact (mobile)
+   ========================================= */
+
+/* Table standard (desktop) déjà stylée ailleurs */
+
+/* Mobile ≤ 768px : compact sans scroll si possible */
+@media (max-width: 768px) {
+  /* Le conteneur ne scrolle que si vraiment nécessaire */
+  #leaderboard {
+    display: block;
+    overflow-x: hidden;              /* on désactive le scroll par défaut */
+  }
+
+  /* Table compacte : auto-layout + cellules respirent moins */
+  .leaderboard-table {
+    table-layout: auto;              /* laisse le navigateur serrer intelligemment */
+    width: 100%;
+  }
+
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 6px 8px;                /* padding réduit */
+    font-size: 14px;                 /* police réduite */
+    line-height: 1.2;
+    white-space: normal;             /* autorise les retours à la ligne */
+    word-break: break-word;
+  }
+
+  /* Colonne # étroite */
+  .leaderboard-table th:nth-child(1),
+  .leaderboard-table td:nth-child(1) {
+    width: 36px;
+    min-width: 36px;
+    text-align: center;
+  }
+
+  /* Colonne "Pooler" peut s'étendre sur 2 lignes */
+  .leaderboard-table th:nth-child(2),
+  .leaderboard-table td:nth-child(2) {
+    width: auto;                     /* laisse de la place au nom */
+  }
+  .leaderboard-table .link-btn {
+    white-space: normal;
+    text-align: left;
+  }
+
+  /* Colonne "Points total" en surbrillance (déjà définie), on garde l'accent
+     et on réduit très légèrement la graisse pour gagner de la place visuelle */
+  .leaderboard-table th:nth-child(3),
+  .leaderboard-table td:nth-child(3) {
+    background: rgba(255, 215, 0, 0.08);
+    color: #fff;
+    font-weight: 700;
+  }
+  .leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
+
+  /* Séparateur juste après "Points total" (col 4 = Points hier) */
+  .leaderboard-table th:nth-child(4),
+  .leaderboard-table td:nth-child(4) {
+    border-left: 2px solid #2c3e70;
+  }
+
+  /* Réduit le libellé en 2 lignes si besoin (automatique grâce à white-space: normal) */
+  .leaderboard-table th {
+    text-align: left;
+  }
+
+  /* Ultra-compact (≤ 420px) : encore un cran de densité */
+  @media (max-width: 420px) {
+    .leaderboard-table th,
+    .leaderboard-table td {
+      padding: 5px 6px;
+      font-size: 13px;
+    }
+    /* “Pooler” peut aller jusqu’à 3 lignes sur très petit écran */
+    .leaderboard-table td:nth-child(2) .link-btn {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+}
