@@ -1433,6 +1433,7 @@ function renderLeaderboard() {
 
   html.push('</tbody></table>');
   cont.innerHTML = html.join('');
+  renderLeaderboardCardsMobile();  // active les cartes si mobile et rend OK
 
   // clic sur nom -> modale
   var btns = cont.querySelectorAll('[data-open-pooler]');
