@@ -205,3 +205,45 @@ button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
     height: 90vh; margin: 0; top: 5vh;
   }
 }
+
+/* =========================================
+   MOBILE (≤ 768px) : ordre & présentation
+   ========================================= */
+@media (max-width: 768px) {
+  /* 1) Positionner le CLASSEMENT en premier visuellement */
+  #leaderboard-section { order: 1; }
+  #poolers-section     { order: 2; }
+  /* Les autres sections suivent */
+  .card { order: 10; } /* valeur par défaut si non précisée */
+
+  /* 2) Poolers en cartes (au lieu d’un tableau large) */
+  #poolers-list.table { display: none; } /* cache le tableau en mobile */
+  #poolers-cards { display: grid; gap: 10px; }
+  #poolers-cards .pooler-card {
+    background: #0f1729; border: 1px solid #223155; border-radius: 10px;
+    padding: 10px 12px;
+  }
+  #poolers-cards .pooler-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px;
+  }
+  #poolers-cards .pooler-name { font-weight: 700; font-size: 1.05rem; color:#eaf3ff; }
+  #poolers-cards .pooler-slots { font-size: .9rem; color:#9fb1d9; }
+  #poolers-cards .roster-list {
+    display: flex; flex-wrap: wrap; gap: 6px 10px;
+    list-style: none; margin: 0; padding: 0;
+  }
+  #poolers-cards .tag {
+    display: inline-block; padding: 3px 8px; border-radius: 999px;
+    background: #1a2444; color: #dbe7ff; border: 1px solid #364a7a;
+    font-size: .85rem;
+  }
+  #poolers-cards .tag.G { background:#1d2e1d; border-color:#2f5d2f; color:#dff9df; }    /* Gardien */
+  #poolers-cards .tag.D { background:#2b2433; border-color:#5c3c7a; color:#f0e2ff; }    /* Défenseur */
+  #poolers-cards .tag.F { background:#1a2444; border-color:#364a7a; color:#dbe7ff; }    /* Attaquant */
+}
+
+/* Desktop : montrer le tableau, masquer les cartes  */
+@media (min-width: 769px) {
+  #poolers-cards { display: none; }
+}
