@@ -190,7 +190,7 @@ function bindGateUI() {
 function setStatus(level='ok', text=''){
   const badge = document.getElementById('status-badge');
   if (!badge) return;
-  badge.hidden = false;
+  badge.hidden = false;                // force l’affichage
   badge.classList.remove('ok','warn','err');
   badge.classList.add(level);
   badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text || ' '}</span>`;
@@ -217,18 +217,18 @@ function safeFixed(v, d = 1) {
 }
 
 // ---------- Compte les "matchs joués" (1 ligne de stats = 1 match) ----------
-function countMatches(playerName, fromStr, toStr) {
+function countMatches(playerName, fromStr, toStr){
   const days = state.stats?.[playerName] || {};
   const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
-  const toEff = toStr || new Date().toISOString().slice(0, 10); // "aujourd'hui" si vide
+  const toEff = toStr || new Date().toISOString().slice(0,10);
   const to = new Date(toEff + 'T23:59:59');
 
   let mj = 0;
-  Object.keys(days).forEach(d => {
+  Object.entries(days).forEach(([d,v]) => {
     const dt = new Date(d + 'T12:00:00');
     if (from && dt < from) return;
-    if (to && dt > to) return;
-    mj += 1;
+    if (to   && dt > to)   return;
+    mj += Number(v?.played || 0);
   });
   return mj;
 }
@@ -748,7 +748,10 @@ function renderPlayers(filter = '') {
 
     const td = document.createElement('td');
     const del = document.createElement('button');
-    del.className = 'secondary only-manager';       // ⬅️ important
+    
+del.className = 'secondary only-manager';
+del.setAttribute('data-role','manager-only')
+
     del.textContent = 'Supprimer';
     del.onclick = () => {
       state.players = state.players.filter(x => x !== p);
@@ -937,23 +940,53 @@ function importPlayersFromCSV(text){
 
 // --- Poolers & draft ---
 function renderPoolers(){
-  const cont = qs('#poolers-list');
+  const cont = document.getElementById('poolers-list');
+  if (!cont) return;
+
+  // option : pas de zébrage dans cette zone
+  cont.classList.add('no-zebra');
+
   const table = document.createElement('table');
-  table.innerHTML = '<thead><tr><th>Pooler</th><th>Skaters</th><th>Gardiens</th><th>Roster</th><th></th></tr></thead>';
+  table.classList.add('table');
+  table.innerHTML = `
+    <thead>
+      <tr><th>Pooler</th><th>Skaters</th><th>Gardiens</th><th>Roster</th><th class="only-manager" data-role="manager-only"></th></tr>
+    </thead>`;
   const tbody = document.createElement('tbody');
-  state.poolers.forEach(pl=>{
-    const rosterCounts = countRoster(pl);
+
+  (state.poolers || []).forEach(pl => {
+    const counts = countRoster(pl); // déjà existant chez toi
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${pl.name}</td><td>${rosterCounts.sk}/${pl.roster.skaters}</td><td>${rosterCounts.go}/${pl.roster.goalies}</td>`;
-    const tdRoster = document.createElement('td');
-    tdRoster.textContent = (pl.players||[]).join(', ');
-    const tdActions = document.createElement('td');
-    const del = document.createElement('button'); del.className='secondary'; del.textContent='Supprimer'; del.onclick = ()=>{ state.poolers = state.poolers.filter(x=>x!==pl); State.save(state); renderPoolers(); refreshDraftPooler(); computeAndRender(); };
-    tdActions.appendChild(del);
-    tr.appendChild(tdRoster); tr.appendChild(tdActions);
+    tr.innerHTML = `
+      <td>${pl.name}</td>
+      <td>${counts.sk}/${pl.roster.skaters}</td>
+      <td>${counts.go}/${pl.roster.goalies}</td>
+      <td>${(pl.players||[]).join(', ')}</td>
+    `;
+
+    // Colonne "actions" visible uniquement côté manager (si tu gardes ce bouton)
+    const td = document.createElement('td');
+    const del = document.createElement('button');
+    del.className = 'secondary only-manager';
+    del.setAttribute('data-role','manager-only');          // <= double filet de sécurité
+    del.textContent = 'Supprimer';
+    del.onclick = () => {
+      state.poolers = (state.poolers||[]).filter(x => x !== pl);
+      State.save(state);
+      renderPoolers();
+      refreshDraftPooler?.();
+      renderRosterView?.();
+      computeAndRender?.();
+    };
+    td.appendChild(del);
+    tr.appendChild(td);
+
     tbody.appendChild(tr);
   });
-  table.appendChild(tbody); cont.innerHTML=''; cont.appendChild(table);
+
+  table.appendChild(tbody);
+  cont.innerHTML = '';
+  cont.appendChild(table);
 }
 function bindPoolers(){
   qs('#add-pooler').onclick = ()=>{
@@ -1046,7 +1079,10 @@ function renderRosterView() {
 if (canEdit) {
   const td = document.createElement('td');
   const rm = document.createElement('button');
-  rm.className = 'secondary only-manager';    // ⬅️ important
+  
+rm.className = 'secondary only-manager';
+rm.setAttribute('data-role','manager-onl
+
   rm.textContent = 'Retirer';
   rm.onclick = () => {
     pl.players = (pl.players || []).filter(n => n !== p.name);
@@ -1070,20 +1106,51 @@ if (canEdit) {
 let autoTimer = null;
 async function ingestStatsFromCSVText(text){
   const rows = CSV.parse(text);
-  if(!rows.length) return;
-  const header = rows.shift().map(h=>h.toLowerCase());
-  const idx = { date: header.indexOf('date'), player: header.indexOf('player'), goals: header.indexOf('goals'), assists: header.indexOf('assists'), win: header.indexOf('goalie_win'), otl: header.indexOf('goalie_otl'), so: header.indexOf('shutout') };
-  rows.forEach(r=>{
-    const player = (r[idx.player]||'').trim(); if(!player) return;
-    const key = (r[idx.date]||'').slice(0,10);
-    const goals = parseFloat(r[idx.goals]||0)||0; const assists = parseFloat(r[idx.assists]||0)||0; const win = parseInt(r[idx.win]||0)||0; const otl = parseInt(idx.otl>=0 ? (r[idx.otl]||0) : 0)||0; const so = parseInt(r[idx.so]||0)||0;
-    state.stats[player] = state.stats[player] || {};
-    state.stats[player][key] = {goals, assists, win, otl, so};
+  if (!rows.length) return;
+
+  const norm = s => String(s||'').toLowerCase().replace(/\s+|_/g,'');
+  const header = rows.shift().map(norm);
+
+  const idx = {
+    date:    header.indexOf('date'),
+    player:  header.indexOf('player'),
+    goals:   header.indexOf('goals')   >= 0 ? header.indexOf('goals')   : header.indexOf('but'),
+    assists: header.indexOf('assists') >= 0 ? header.indexOf('assists') : header.indexOf('passes'),
+    win:     ['goaliewin','win','w','victoiregardien','victoire'].map(k=>header.indexOf(k)).find(i=>i>=0) ?? -1,
+    otl:     ['goalieotl','otl','otloss','defaiteot','defaiteprolongation'].map(k=>header.indexOf(k)).find(i=>i>=0) ?? -1,
+    so:      ['shutout','so','blanchissage'].map(k=>header.indexOf(k)).find(i=>i>=0) ?? -1,
+    played:  ['played','games','gp','matchs','mj'].map(k=>header.indexOf(k)).find(i=>i>=0) ?? -1
+  };
+
+  if (idx.date < 0 || idx.player < 0 || idx.goals < 0 || idx.assists < 0) {
+    console.warn('[Stats] En-têtes indispensables manquants. Reçus =', header);
+    return;
+  }
+
+  rows.forEach(r => {
+    const name = (r[idx.player] || '').toString().trim();
+    if (!name) return;
+
+    const key = (r[idx.date] || '').toString().slice(0,10); // YYYY-MM-DD
+    const goals   = Number(r[idx.goals]   || 0) || 0;
+    const assists = Number(r[idx.assists] || 0) || 0;
+    const win     = idx.win   >= 0 ? (Number(r[idx.win]  || 0) || 0) : 0;
+    const otl     = idx.otl   >= 0 ? (Number(r[idx.otl]  || 0) || 0) : 0;
+    const so      = idx.so    >= 0 ? (Number(r[idx.so]   || 0) || 0) : 0;
+    const played  = idx.played>= 0 ? (Number(r[idx.played]|| 0) || 0) : 1; // fallback: 1 entrée = 1 match
+
+    state.stats[name] = state.stats[name] || {};
+    state.stats[name][key] = { goals, assists, win, otl, so, played };
   });
+
   state.lastUpdate = new Date().toISOString();
   State.save(state);
+
+  // "Dernière mise à jour" (manager-only) : garde-fou
+  const lu = document.getElementById('last-update');
+  if (lu) lu.textContent = 'Dernière mise à jour : ' + new Date(state.lastUpdate).toLocaleString();
+
   computeAndRender();
-  qs('#last-update').textContent = `Dernière mise à jour: ${new Date(state.lastUpdate).toLocaleString()}`;
 }
 function bindStats() {
   // Bouton "Mettre à jour maintenant"
@@ -1281,7 +1348,10 @@ function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
   try {
     rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || []).map(r => ({
       ...r,
-      mj: countMatches(r.name, fromStr, toStr)
+     
+mj: countMatches(r.name, fromStr, toStr),  // <= utilise "played"
+    points: Number(r.points || 0)
+
     }));
   } catch (e) {
     console.warn('aggregatePoolerStats error:', e);
@@ -1391,18 +1461,21 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
     }));
 
   const table = document.createElement('table');
-  table.innerHTML = `
-    <thead>
-      <tr><th>Date</th><th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th></tr>
-    </thead>`;
+ 
+table.innerHTML = `
+  <thead>
+    <tr><th>Date</th><th>MJ</th><th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th></tr>
+  </thead>`;
+
   const tbody = document.createElement('tbody');
 
   let sum = {g:0,a:0,win:0,otl:0,so:0,pts:0};
   data.forEach(r => {
+    const dailyMJ = Number(v.played || 0);
     sum.g += r.goals; sum.a += r.assists; sum.win += r.win; sum.otl += r.otl; sum.so += r.so; sum.pts += r.pts;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.date}</td><td>${r.goals}</td><td>${r.assists}</td>
+      <td>${r.date}</td><td>${dailyMJ}</td><td>${r.goals}</td><td>${r.assists}</td>
       <td>${r.win}</td><td>${r.otl}</td><td>${r.so}</td><td><strong>${r.pts.toFixed(1)}</strong></td>`;
     tbody.appendChild(tr);
   });
@@ -1506,12 +1579,12 @@ if (recomputeBtn) {
   try {
     setStatusWarn('Synchronisation automatique…');
     await refreshAllRemote();
-    const p = (state.players||[]).length;
+    const p  = (state.players||[]).length;
     const pl = (state.poolers||[]).length;
     const sp = Object.keys(state.stats||{}).length;
-    setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats joueurs: ${sp}`);
+    setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats-joueurs: ${sp}`);
     computeAndRender();
-  } catch(e) {
+  } catch (e) {
     console.warn('auto-refresh error:', e);
     setStatusErr('Erreur de synchronisation (auto)');
   }
@@ -1526,7 +1599,7 @@ if (clientRefreshBtn) {
       const p  = (state.players||[]).length;
       const pl = (state.poolers||[]).length;
       const sp = Object.keys(state.stats||{}).length;
-      setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats: ${sp}`);
+      setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats-joueurs: ${sp}`);
       computeAndRender();
     } catch (e) {
       console.warn('client refresh error:', e);
