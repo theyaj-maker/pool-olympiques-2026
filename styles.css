@@ -104,12 +104,10 @@ body[data-role="viewer"] .only-manager { display: none !important; }
 .btn-ghost:hover{ background:#182544; }
 .btn-ghost.small{ font-size: 12px; padding: 4px 8px; }
 
-/* === Masquer toutes les actions d’édition côté viewer === */
+/* Cacher toutes les actions d’édition côté viewer */
 body[data-role="viewer"] .only-manager { display: none !important; }
 
-/* === Zébrage OFF dans les modales et partout où la classe no-zebra est appliquée === */
+/* Désactiver le zébrage (alternance) dans les modales et zones marquées */
 dialog .table tr:nth-child(even),
 .no-zebra .table tr:nth-child(even),
-.table.no-zebra tr:nth-child(even){
-  background: transparent !important;
-}
+.table.no-zebra tr:nth-child(even) { background: transparent !important; }
