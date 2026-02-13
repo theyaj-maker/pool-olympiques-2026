@@ -304,3 +304,119 @@ dialog {
     height: 90vh; margin: 0; top: 5vh;
   }
 }
+
+/* =========================================
+   CLASSEMENT — rendu cartes mobile
+   ========================================= */
+/* Par défaut on cache les cartes, on affiche la table */
+#leaderboard-cards { display: none; }
+
+/* Mobile : on inverse (cartes ON, table OFF) */
+@media (max-width: 768px) {
+  #leaderboard { display: none !important; }
+  #leaderboard-cards { display: grid; gap: 10px; }
+
+  .lb-card {
+    background: #0f1729;
+    border: 1px solid #223155;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .lb-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .lb-rank {
+    min-width: 32px; height: 32px; border-radius: 999px;
+    background: #1b2a4d; color: #dfeaff; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .lb-name {
+    flex: 1; font-weight: 700; color: #eaf3ff;
+  }
+
+  /* Points total mis en avant */
+  .lb-total {
+    background: rgba(255,215,0,0.10);
+    color: #ffe27a; font-weight: 800;
+    padding: 6px 8px; border-radius: 8px; min-width: 84px; text-align: right;
+    border: 1px solid rgba(255,215,0,0.25);
+  }
+
+  .lb-sub {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .lb-badge {
+    display: inline-flex; gap: 6px; align-items: center;
+    background: #10203f; color: #cfe2ff; border: 1px solid #2b4374;
+    border-radius: 999px; padding: 4px 8px; font-size: 13px;
+  }
+  .lb-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; background: #3a6fe8;
+  }
+  .lb-badge.today .dot { background: #36c27a; }
+  .lb-badge.yest  .dot { background: #e8c43a; }
+}
+
+/* =========================================
+   MODALE — rendu cartes mobile
+   ========================================= */
+/* Par défaut, on cache les cartes modale */
+#pooler-players-cards,
+#pooler-daily-cards { display: none; }
+
+/* Mobile : cartes ON, tables OFF */
+@media (max-width: 768px) {
+  #pooler-players-table,
+  #pooler-daily-table { display: none !important; }
+
+  #pooler-players-cards,
+  #pooler-daily-cards { display: grid; gap: 10px; }
+
+  .pl-card, .day-card {
+    background: #0f1729;
+    border: 1px solid #223155;
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  .pl-head {
+    display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px;
+  }
+  .pl-name { font-weight: 700; color: #eaf3ff; }
+  .pl-meta { font-size: 13px; color: #a8b5d7; }
+
+  .pl-stats, .day-stats {
+    display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 8px;
+  }
+  .stat {
+    background: #101b33; border: 1px solid #263a66; border-radius: 8px;
+    padding: 6px 8px; text-align: center; font-size: 13px; color: #cfe2ff;
+  }
+  .stat .v { display:block; font-weight: 800; font-size: 16px; color: #eaf3ff; }
+
+  .day-head {
+    display:flex; justify-content: space-between; gap:8px; margin-bottom:6px;
+    color:#cfe2ff; font-weight:600;
+  }
+}
+
+/* =========================================
+   BADGE de synchro — coin haut‑droit + réserve
+   ========================================= */
+.status-badge{
+  position: fixed; z-index: 10000; top: 10px; right: 10px; left: auto; transform: none;
+}
+@media (max-width: 768px) {
+  body.has-status-badge { padding-top: 56px; }
+}
+
+/* =========================================
+   Masquage viewer (déjà en place)
+   ========================================= */
+body[data-role="viewer"] .only-manager,
+body[data-role="viewer"] [data-role="manager-only"] {
+  display: none !important;
+}
