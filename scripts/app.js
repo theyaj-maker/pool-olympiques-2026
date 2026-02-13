@@ -1252,7 +1252,7 @@ function renderLeaderboard() {
   const cont = document.getElementById('leaderboard');
   if (!cont) return;
 
-  // Utilise le nouveau calcul enrichi
+  // Utilise le calcul enrichi (total + today + yesterday)
   let totals = [];
   try {
     totals = computeScoresWithDaily() || [];
@@ -1268,9 +1268,9 @@ function renderLeaderboard() {
       <tr>
         <th>#</th>
         <th>Pooler</th>
-        <th>Points</th>
-        <th>Points aujourd’hui</th>
+        <th>Points total</th>
         <th>Points hier</th>
+        <th>Points aujourd’hui</th>
       </tr>
     </thead>`;
 
@@ -1287,18 +1287,18 @@ function renderLeaderboard() {
         <td>${i + 1}</td>
         <td><button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button></td>
         <td><strong>${Number(r.points || 0).toFixed(1)}</strong></td>
-        <td>${Number(r.today || 0).toFixed(1)}</td>
-        <td>${Number(r.yest  || 0).toFixed(1)}</td>`;
+        <td>${Number(r.yest  || 0).toFixed(1)}</td>
+        <td>${Number(r.today || 0).toFixed(1)}</td>`;
       tbody.appendChild(tr);
     });
 
-    // Note si tous à zéro
+    // Note si tous à zéro (facultatif)
     const allZero = totals.every(t => (t.points||0) === 0);
     if (allZero) {
       const note = document.createElement('tr');
       note.innerHTML = `
         <td colspan="5" class="muted">
-          Tous les scores sont à 0. Vérifie que les rosters et l’URL <strong>Stats CSV</strong> sont valides.
+          Tous les scores sont à 0. Vérifie les rosters et l’URL <strong>Stats CSV</strong>.
         </td>`;
       tbody.appendChild(note);
     }
@@ -1308,7 +1308,7 @@ function renderLeaderboard() {
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Conserver le clic pour la "vue pooler" si tu l’utilises
+  // Conserver l’ouverture de la modale "vue pooler"
   cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
     btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
