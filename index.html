@@ -105,24 +105,35 @@
 
     <!-- DATA (manager) -->
     <section class="card" id="data-section" data-role="manager-only">
-      <h2>Sources & Statistiques</h2>
-      <h3>URL CSV des Stats</h3>
-      <input id="stats-url" placeholder="URL CSV des stats (publié)">
-      <div class="actions">
-        <button id="fetch-stats">Mettre à jour maintenant</button>
-        <label><input type="checkbox" id="auto-refresh"> Rafraîchir toutes les 5 min</label>
-      </div>
-      <div id="last-update" class="muted"></div>
+      
+<!-- Sources distantes (CSV publiés) -->
+<div class="card" style="margin-top:8px;" data-role="manager-only">
+  <h3>Sources distantes (CSV publiés)</h3>
+  <p>Colle les URLs CSV publiées (Google Sheets → Fichier → Partager → Publier sur le Web → CSV → Onglet).</p>
+  <div class="grid-2">
+    <label>URL CSV des <strong>Joueurs</strong> (Joueurs!A:D)
+      <input id="players-url" placeholder="https://docs.google.com/.../gviz/tq?tqx=out:csv&gid=...">
+    </label>
+    <label>URL CSV des <strong>Poolers</strong> (Poolers!A:E)
+      <input id="poolers-url" placeholder="https://docs.google.com/.../gviz/tq?tqx=out:csv&gid=...">
+    </label>
+  </div>
+  <div class="grid-2">
+    <label>URL CSV des <strong>Stats</strong> (Stats!A:G)
+      <input id="stats-url" placeholder="https://docs.google.com/.../gviz/tq?tqx=out:csv&gid=...">
+    </label>
+  </div>
+  <div class="actions">
+    <button id="save-remote-sources">Sauvegarder les URLs</button>
+    <button id="refresh-remote" class="secondary">Rafraîchir maintenant</button>
+  </div>
+  <p class="muted">
+    Joueurs&nbsp;: <code>name,position,team,box</code> •
+    Poolers&nbsp;: <code>pooler,player,position,team,box</code> •
+    Stats&nbsp;: <code>date,player,goals,assists,goalie_win,goalie_otl,shutout</code>
+  </p>
+</div>
 
-      <h3>Sources distantes (Poolers & Rosters)</h3>
-      <div class="grid-2">
-        <label>URL Poolers CSV <input id="poolers-url"></label>
-        <label>URL Rosters CSV <input id="rosters-url"></label>
-      </div>
-      <div class="actions">
-        <button id="save-remote-sources">Sauvegarder les URLs</button>
-        <button id="refresh-remote" class="secondary">Rafraîchir maintenant</button>
-      </div>
     </section>
 
     
