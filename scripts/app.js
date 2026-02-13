@@ -1182,6 +1182,23 @@ function bindStats() {
 // =====================================================
 // CLASSEMENT – calcul des points par pooler
 // =====================================================
+
+// Renvoie la date locale sous forme 'YYYY-MM-DD' (en tenant compte du fuseau du navigateur)
+function localISODate(d) {
+  // Clone, et corrige avec le décalage de fuseau pour obtenir la "date civile" locale
+  const t = new Date(d.getTime() - d.getTimezoneOffset() * 60 * 1000);
+  return t.toISOString().slice(0, 10);
+}
+
+function getTodayAndYesterday() {
+  const now = new Date();
+  const todayStr = localISODate(now);
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  const yesterdayStr = localISODate(y);
+  return { todayStr, yesterdayStr };
+}
+
 function computeScores() {
   const s = state && state.scoring
     ? state.scoring
@@ -1235,35 +1252,53 @@ function renderLeaderboard() {
   const cont = document.getElementById('leaderboard');
   if (!cont) return;
 
-  const totals = computeScores();
+  // Utilise le nouveau calcul enrichi
+  let totals = [];
+  try {
+    totals = computeScoresWithDaily() || [];
+  } catch (e) {
+    console.error('[Leaderboard] computeScoresWithDaily() error:', e);
+    totals = [];
+  }
 
   const table = document.createElement('table');
+  table.classList.add('table');
   table.innerHTML = `
     <thead>
-      <tr><th>#</th><th>Pooler</th><th>Points</th></tr>
+      <tr>
+        <th>#</th>
+        <th>Pooler</th>
+        <th>Points</th>
+        <th>Points aujourd’hui</th>
+        <th>Points hier</th>
+      </tr>
     </thead>`;
+
   const tbody = document.createElement('tbody');
 
   if (!totals.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="3"><em>Aucun pooler à afficher</em></td>`;
+    tr.innerHTML = `<td colspan="5"><em>Aucun pooler à afficher</em></td>`;
     tbody.appendChild(tr);
   } else {
     totals.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${i+1}</td>
+        <td>${i + 1}</td>
         <td><button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button></td>
-        <td><strong>${r.points.toFixed(1)}</strong></td>`;
+        <td><strong>${Number(r.points || 0).toFixed(1)}</strong></td>
+        <td>${Number(r.today || 0).toFixed(1)}</td>
+        <td>${Number(r.yest  || 0).toFixed(1)}</td>`;
       tbody.appendChild(tr);
     });
 
-    const allZero = totals.every(t => t.points === 0);
+    // Note si tous à zéro
+    const allZero = totals.every(t => (t.points||0) === 0);
     if (allZero) {
       const note = document.createElement('tr');
       note.innerHTML = `
-        <td colspan="3" class="muted">
-          Tous les scores sont à 0. Vérifie que les rosters ne sont pas vides et que l’URL <strong>Stats CSV</strong> est bien publiée/valide.
+        <td colspan="5" class="muted">
+          Tous les scores sont à 0. Vérifie que les rosters et l’URL <strong>Stats CSV</strong> sont valides.
         </td>`;
       tbody.appendChild(note);
     }
@@ -1273,11 +1308,85 @@ function renderLeaderboard() {
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Ouvre la vue pooler au clic
+  // Conserver le clic pour la "vue pooler" si tu l’utilises
   cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
     btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
 }
+// =====================================================
+// CLASSEMENT – total + points "aujourd'hui" + "hier"
+// =====================================================
+function computeScoresWithDaily() {
+  const s = state && state.scoring
+    ? state.scoring
+    : { goal: 1, assist: 1, goalie_win: 2, goalie_otl: 1, shutout: 3 };
+
+  const poolers = Array.isArray(state?.poolers) ? state.poolers : [];
+  const statsByPlayer = state?.stats || {};
+  const { todayStr, yesterdayStr } = getTodayAndYesterday();
+
+  const out = [];
+
+  poolers
+    .filter(pl => pl && pl.name)
+    .forEach(pl => {
+      const roster = Array.isArray(pl.players) ? pl.players.filter(Boolean) : [];
+
+      let total = 0;
+      let todayPts = 0;
+      let yestPts = 0;
+
+      roster.forEach(name => {
+        const days = statsByPlayer[name] || {};
+        // total (toutes dates)
+        Object.values(days).forEach(v => {
+          const gg = Number(v?.goals   || 0);
+          const aa = Number(v?.assists || 0);
+          const ww = Number(v?.win     || 0);
+          const oo = Number(v?.otl     || 0);
+          const ss = Number(v?.so      || 0);
+          total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+        });
+        // aujourd'hui
+        if (days[todayStr]) {
+          const v = days[todayStr];
+          const gg = Number(v?.goals   || 0);
+          const aa = Number(v?.assists || 0);
+          const ww = Number(v?.win     || 0);
+          const oo = Number(v?.otl     || 0);
+          const ss = Number(v?.so      || 0);
+          todayPts += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+        }
+        // hier
+        if (days[yesterdayStr]) {
+          const v = days[yesterdayStr];
+          const gg = Number(v?.goals   || 0);
+          const aa = Number(v?.assists || 0);
+          const ww = Number(v?.win     || 0);
+          const oo = Number(v?.otl     || 0);
+          const ss = Number(v?.so      || 0);
+          yestPts += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+        }
+      });
+
+      out.push({
+        pooler: pl.name,
+        points: Number.isFinite(total) ? total : 0,
+        today:  Number.isFinite(todayPts) ? todayPts : 0,
+        yest:   Number.isFinite(yestPts) ? yestPts : 0,
+        rosterCount: roster.length
+      });
+    });
+
+  // tri: points desc puis nom asc
+  out.sort((a, b) => (b.points - a.points) || a.pooler.localeCompare(b.pooler));
+
+  return out;
+}
+
+// Exposer en console si utile
+window.computeScoresWithDaily = computeScoresWithDaily;
+
 function bindLeagueIO(){
   qs('#export-league').onclick = ()=>{
     const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
