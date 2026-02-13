@@ -1421,14 +1421,16 @@ mj: countMatches(r.name, fromStr, toStr),  // <= utilise "played"
   cont.appendChild(table);
 
   // Bind "Voir" -> table quotidienne
-  cont.querySelectorAll('[data-open-player]').forEach(btn => {
-    btn.onclick = () => {
-      const name = btn.getAttribute('data-open-player');
-      const from = document.getElementById('pooler-from')?.value || '';
-      const to   = document.getElementById('pooler-to')?.value   || '';
-      renderPoolerDailyTable(poolerName, name, from, to);
-    };
-  });
+  
+cont.querySelectorAll('button[data-open-player]').forEach(function (btn) {
+  btn.onclick = function () {
+    const playerName = btn.getAttribute('data-open-player');
+    const from = (document.getElementById('pooler-from')?.value) || '';
+    const to   = (document.getElementById('pooler-to')?.value)   || '';
+    renderPoolerDailyTable(poolerName, playerName, from, to);
+  };
+});
+
 
   // Réinitialise la zone quotidienne si aucun joueur sélectionné
   const titleDaily = document.getElementById('pooler-daily-title');
@@ -1437,64 +1439,116 @@ mj: countMatches(r.name, fromStr, toStr),  // <= utilise "played"
   if (daily) daily.innerHTML = '';
 }
 function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
-  const title = document.getElementById('pooler-daily-title');
-  const cont  = document.getElementById('pooler-daily-table');
-  if (!title || !cont) return;
+  const titleEl = document.getElementById('pooler-daily-title');
+  const cont = document.getElementById('pooler-daily-table');
+  if (!titleEl || !cont) return;
 
-  title.textContent = `Détail par date — ${playerName}`;
-  title.style.display = '';
+  // Désactive le zébrage dans cette zone
+  cont.classList.add('no-zebra');
 
-  const s = state.scoring;
+  // Affiche le titre
+  titleEl.textContent = 'Détail par date — ' + playerName;
+  titleEl.style.display = '';
+
+  // Bornes de dates (par défaut, Au = aujourd’hui si toStr vide)
   const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
-  const to   = toStr   ? new Date(toStr   + 'T23:59:59') : null;
+  const toEff = toStr || new Date().toISOString().slice(0, 10);
+  const to = new Date(toEff + 'T23:59:59');
 
-  const days = state.stats[playerName] || {};
-  const data = Object.entries(days)
-    .filter(([d]) => {
-      const dt = new Date(d + 'T12:00:00');
+  // Récupère les stats du joueur
+  const days = (state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
+  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+
+  // Transforme en lignes {date, goals, assists, win, otl, so, played, points}
+  const data = Object.keys(days)
+    .filter(function (d) {
+      // sécurité : d doit ressembler à YYYY-MM-DD
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+      const dt = new Date(d + 'T12:00:00'); // milieu de journée pour éviter TZ bizarres
       if (from && dt < from) return false;
-      if (to   && dt > to)   return false;
+      if (to && dt > to) return false;
       return true;
     })
-    .sort(([a],[b]) => a.localeCompare(b))
-    .map(([d,v]) => ({
-      date: d,
-      goals: v.goals||0,
-      assists: v.assists||0,
-      win: v.win||0,
-      otl: v.otl||0,
-      so: v.so||0,
-      pts: (v.goals||0)*s.goal + (v.assists||0)*s.assist +
-           (v.win||0)*s.goalie_win + (v.otl||0)*s.goalie_otl + (v.so||0)*s.shutout
-    }));
+    .sort(function (a, b) { return a.localeCompare(b); })
+    .map(function (d) {
+      const v = days[d] || {};
+      const goals   = Number(v.goals   || 0);
+      const assists = Number(v.assists || 0);
+      const win     = Number(v.win     || 0);
+      const otl     = Number(v.otl     || 0);
+      const so      = Number(v.so      || 0);
+      // MJ depuis la colonne "played" si elle existe, sinon 1 (une ligne = un match)
+      const played  = (v.hasOwnProperty('played')) ? (Number(v.played) || 0) : 1;
+      const points  = (goals * s.goal) + (assists * s.assist) + (win * s.goalie_win) + (otl * s.golie_otl || 0) + (so * s.shutout);
+      // NB: typo possible sur s.golie_otl => corrigeons si ta clé est s.goalie_otl
+      const ptsSafe = Number.isFinite(points)
+        ? points
+        : (goals * s.goal) + (assists * s.assist) + (win * s.goalie_win) + (otl * (s.goalie_otl || 0)) + (so * s.shutout);
 
+      return { date: d, played: played, goals: goals, assists: assists, win: win, otl: otl, so: so, points: ptsSafe };
+    });
+
+  // Construit le tableau (inclut MJ)
   const table = document.createElement('table');
- 
-table.innerHTML = `
-  <thead>
-    <tr><th>Date</th><th>MJ</th><th>Buts</th><th>Passes</th><th>Win</th><th>OTL</th><th>SO</th><th>Points</th></tr>
-  </thead>`;
+  table.classList.add('table');
+  table.innerHTML = '' +
+    '<thead>' +
+      '<tr>' +
+        '<th>Date</th>' +
+        '<th>MJ</th>' +
+        '<th>Buts</th>' +
+        '<th>Passes</th>' +
+        '<th>Win</th>' +
+        '<th>OTL</th>' +
+        '<th>SO</th>' +
+        '<th>Points</th>' +
+      '</tr>' +
+    '</thead>';
 
   const tbody = document.createElement('tbody');
 
-  let sum = {g:0,a:0,win:0,otl:0,so:0,pts:0};
-  data.forEach(r => {
-    const dailyMJ = Number(v.played || 0);
-    sum.g += r.goals; sum.a += r.assists; sum.win += r.win; sum.otl += r.otl; sum.so += r.so; sum.pts += r.pts;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${r.date}</td><td>${dailyMJ}</td><td>${r.goals}</td><td>${r.assists}</td>
-      <td>${r.win}</td><td>${r.otl}</td><td>${r.so}</td><td><strong>${r.pts.toFixed(1)}</strong></td>`;
-    tbody.appendChild(tr);
-  });
+  // Accumulateurs
+  var sumMJ = 0, sumG = 0, sumA = 0, sumW = 0, sumO = 0, sumS = 0, sumPts = 0;
 
-  // ligne total
+  if (!data.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="8"><em>Aucune donnée dans la période sélectionnée.</em></td>';
+    tbody.appendChild(tr);
+  } else {
+    data.forEach(function (r) {
+      sumMJ  += r.played || 0;
+      sumG   += r.goals   || 0;
+      sumA   += r.assists || 0;
+      sumW   += r.win     || 0;
+      sumO   += r.otl     || 0;
+      sumS   += r.so      || 0;
+      sumPts += r.points  || 0;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + r.date + '</td>' +
+        '<td>' + (r.played || 0) + '</td>' +
+        '<td>' + (r.goals || 0) + '</td>' +
+        '<td>' + (r.assists || 0) + '</td>' +
+        '<td>' + (r.win || 0) + '</td>' +
+        '<td>' + (r.otl || 0) + '</td>' +
+        '<td>' + (r.so || 0) + '</td>' +
+        '<td><strong>' + (Number(r.points || 0).toFixed(1)) + '</strong></td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Ligne total
   const trSum = document.createElement('tr');
-  trSum.innerHTML = `
-    <td><strong>Total</strong></td>
-    <td><strong>${sum.g}</strong></td><td><strong>${sum.a}</strong></td>
-    <td><strong>${sum.win}</strong></td><td><strong>${sum.otl}</strong></td><td><strong>${sum.so}</strong></td>
-    <td><strong>${sum.pts.toFixed(1)}</strong></td>`;
+  trSum.innerHTML =
+    '<td><strong>Total</strong></td>' +
+    '<td><strong>' + sumMJ + '</strong></td>' +
+    '<td><strong>' + sumG + '</strong></td>' +
+    '<td><strong>' + sumA + '</strong></td>' +
+    '<td><strong>' + sumW + '</strong></td>' +
+    '<td><strong>' + sumO + '</strong></td>' +
+    '<td><strong>' + sumS + '</strong></td>' +
+    '<td><strong>' + (Number(sumPts).toFixed(1)) + '</strong></td>';
   tbody.appendChild(trSum);
 
   table.appendChild(tbody);
@@ -1506,28 +1560,33 @@ function openPoolerModal(poolerName) {
   const dlg = document.getElementById('pooler-modal');
   if (!dlg) return;
 
-  // calcule min/max à partir des stats du pooler
+  // Collecte des dates présentes pour ce pooler
   const roster = (state.poolers || []).find(p => p.name === poolerName)?.players || [];
   const dateSet = new Set();
-  roster.forEach(name => Object.keys(state.stats[name] || {}).forEach(d => dateSet.add(d)));
-  const dates = Array.from(dateSet).sort();
-  const minD = dates[0] || '';
-  // Par défaut, Au = aujourd'hui (si pas de stats max)
+  roster.forEach(function (n) { Object.keys(state.stats?.[n] || {}).forEach(function (d) { dateSet.add(d); }); });
+  const arr = Array.from(dateSet).sort();
+  const minD = arr[0] || '';
   const today = new Date().toISOString().slice(0,10);
-  const maxD = dates[dates.length-1] || today;
+  const maxD = arr[arr.length - 1] || today;
 
-  document.getElementById('pooler-modal-title').textContent = `Vue — ${poolerName}`;
-  document.getElementById('pooler-from').value = minD;
-  document.getElementById('pooler-to').value   = maxD;
+  document.getElementById('pooler-modal-title').textContent = 'Vue — ' + poolerName;
+  const fromEl = document.getElementById('pooler-from');
+  const toEl   = document.getElementById('pooler-to');
+  if (fromEl) fromEl.value = minD;
+  if (toEl)   toEl.value   = maxD;
 
   renderPoolerPlayersTable(poolerName, minD, maxD);
 
-  document.getElementById('pooler-apply').onclick = () => {
-    const f = document.getElementById('pooler-from').value;
-    const t = document.getElementById('pooler-to').value || today; // <= si vide → aujourd'hui
-    renderPoolerPlayersTable(poolerName, f, t);
-  };
-  document.getElementById('pooler-close').onclick = () => dlg.close();
+  const btnApply = document.getElementById('pooler-apply');
+  const btnClose = document.getElementById('pooler-close');
+  if (btnApply) {
+    btnApply.onclick = function () {
+      const f = fromEl?.value || '';
+      const t = toEl?.value   || today;
+      renderPoolerPlayersTable(poolerName, f, t);
+    };
+  }
+  if (btnClose) btnClose.onclick = function () { dlg.close(); };
 
   dlg.showModal();
 }
