@@ -244,7 +244,9 @@ function safeFixed(v, d = 1) {
 }
 
 function isMobile() {
-  return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  var w = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 1024;
+  var docW = (typeof document !== 'undefined' && document.documentElement && document.documentElement.clientWidth) ? document.documentElement.clientWidth : w;
+  return (w || docW) <= 768;
 }
 
 // ---------- Compte les "matchs joués" (1 ligne de stats = 1 match) ----------
@@ -1281,12 +1283,55 @@ function localISODate(d) {
 }
 
 function getTodayAndYesterday() {
-  const now = new Date();
-  const todayStr = localISODate(now);
-  const y = new Date(now);
-  y.setDate(now.getDate() - 1);
-  const yesterdayStr = localISODate(y);
-  return { todayStr, yesterdayStr };
+  function localISODate(d) {
+    var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return t.toISOString().slice(0,10);
+  }
+  var now = new Date();
+  var todayStr = localISODate(now);
+  var y = new Date(now); y.setDate(now.getDate()-1);
+  var yesterdayStr = localISODate(y);
+  return { todayStr: todayStr, yesterdayStr: yesterdayStr };
+}
+
+function computeScoresWithDaily() {
+  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  var poolers = (state && state.poolers && state.poolers.length ? state.poolers : []);
+  var statsByPlayer = (state && state.stats) ? state.stats : {};
+  var d = getTodayAndYesterday();
+  var out = [];
+
+  for (var i=0; i<poolers.length; i++) {
+    var pl = poolers[i]; if (!pl || !pl.name) continue;
+    var roster = Array.isArray(pl.players) ? pl.players : [];
+    var total = 0, todayPts = 0, yestPts = 0;
+
+    for (var j=0; j<roster.length; j++) {
+      var name = roster[j];
+      var days = statsByPlayer[name] || {};
+      var keys = Object.keys(days);
+
+      for (var k=0; k<keys.length; k++) {
+        var v = days[keys[k]] || {};
+        var gg = Number(v.goals||0), aa = Number(v.assists||0), ww = Number(v.win||0), oo = Number(v.otl||0), ss = Number(v.so||0);
+        total += gg*s.goal + aa*s.assist + ww*s.goalie_win + oo*s.goalie_otl + ss*s.shutout;
+      }
+
+      if (days[d.todayStr]) {
+        var vt = days[d.todayStr];
+        todayPts += Number(vt.goals||0)*s.goal + Number(vt.assists||0)*s.assist + Number(vt.win||0)*s.goalie_win + Number(vt.otl||0)*s.goalie_otl + Number(vt.so||0)*s.shutout;
+      }
+      if (days[d.yesterdayStr]) {
+        var vy = days[d.yesterdayStr];
+        yestPts += Number(vy.goals||0)*s.goal + Number(vy.assists||0)*s.assist + Number(vy.win||0)*s.goalie_win + Number(vy.otl||0)*s.goalie_otl + Number(vy.so||0)*s.shutout;
+      }
+    }
+
+    out.push({ pooler: pl.name, points: total, today: todayPts, yest: yestPts, rosterCount: roster.length });
+  }
+
+  out.sort(function(a,b){ return (b.points - a.points) || a.pooler.localeCompare(b.pooler); });
+  return out;
 }
 
 function computeScores() {
@@ -1416,46 +1461,6 @@ function compactLeaderboardHeadersIfSmall(){
   }
 }
 
-function renderLeaderboardCardsMobile() {
-  const host = document.getElementById('leaderboard-cards');
-  if (!host) return;
-  host.innerHTML = '';
-
-  if (!isMobile()) { host.style.display = 'none'; return; }
-  host.style.display = 'grid';
-
-  let totals = [];
-  try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
-
-  if (!totals.length) {
-    host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
-    return;
-  }
-
-  totals.forEach((r, i) => {
-    const card = document.createElement('div');
-    card.className = 'lb-card';
-    card.innerHTML = `
-      <div class="lb-head">
-        <div class="lb-rank">${i+1}</div>
-        <div class="lb-name">
-          <button class="link-btn" data-open-pooler="${r.pooler}">${r.pooler}</button>
-        </div>
-        <div class="lb-total">🥇 ${Number(r.points||0).toFixed(1)}</div>
-      </div>
-      <div class="lb-sub">
-        <div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;${Number(r.today||0).toFixed(1)}</div>
-        <div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;${Number(r.yest||0).toFixed(1)}</div>
-      </div>
-    `;
-    host.appendChild(card);
-  });
-
-  // Clic sur le nom => modale
-  host.querySelectorAll('[data-open-pooler]').forEach(btn => {
-    btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
-  });
-}
 
 // =====================================================
 // CLASSEMENT – total + points "aujourd'hui" + "hier"
@@ -2084,6 +2089,7 @@ if (clientRefreshBtn) {
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
 window.addEventListener('resize', placeLeaderboardFirstOnMobile, { passive: true });
 window.addEventListener('resize', renderLeaderboardCardsMobile, { passive: true });
+window.addEventListener('orientationchange', renderLeaderboardCardsMobile, { passive: true });
 placeLeaderboardFirstOnMobile();
 
 
