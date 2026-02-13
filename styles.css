@@ -135,3 +135,30 @@ dialog .table tr:nth-child(even),
   border-right: 2px solid #2c3e70;
 }
 
+/* === Classement : table avec classes .table.leaderboard-table === */
+
+/* Surbrillance de la colonne "Points total" (3e colonne) */
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  background: rgba(255, 215, 0, 0.08);   /* léger fond doré */
+  color: #fff;                            /* texte blanc (ajuste selon thème) */
+  font-weight: 700;                       /* gras pour attirer l’œil */
+}
+
+/* Option : renforcer la valeur dans la cellule (si tu as <strong> côté JS) */
+.leaderboard-table td:nth-child(3) strong {
+  color: #ffe27a;
+}
+
+/* Séparateur visuel entre "Points total" et les colonnes journalières (4e col = "Points hier") */
+.leaderboard-table th:nth-child(4),
+.leaderboard-table td:nth-child(4) {
+  border-left: 2px solid #2c3e70;        /* ajuste la couleur au thème */
+}
+
+/* (Facultatif) un peu d’air à droite de la 3e colonne */
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  padding-right: 10px;
+}
+
