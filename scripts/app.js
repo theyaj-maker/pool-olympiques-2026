@@ -1081,7 +1081,7 @@ if (canEdit) {
   const rm = document.createElement('button');
   
 rm.className = 'secondary only-manager';
-rm.setAttribute('data-role','manager-onl
+rm.setAttribute('data-role','manager-only');
 
   rm.textContent = 'Retirer';
   rm.onclick = () => {
