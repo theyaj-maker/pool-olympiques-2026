@@ -430,3 +430,115 @@ button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
     }
   }
 }
+
+/* =========================================================
+   CLASSEMENT — Wrapper & table
+   ========================================================= */
+
+/* Le wrapper assure le scroll horizontal si besoin */
+#leaderboard-wrap {
+  width: 100%;
+  overflow-x: auto;                 /* permet le défilement si trop serré */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* La table du classement */
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;               /* laisse le navigateur optimiser les largeurs */
+}
+
+/* Cellules par défaut */
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 8px 10px;
+  line-height: 1.25;
+  font-size: 15px;
+  white-space: normal;              /* autorise les retours à la ligne */
+  word-break: break-word;           /* casse les mots longs */
+}
+
+/* # (col 1) étroite et centrée */
+.leaderboard-table th:nth-child(1),
+.leaderboard-table td:nth-child(1) {
+  width: 36px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Pooler (col 2) peut s'étendre et passer sur 2 lignes */
+.leaderboard-table th:nth-child(2),
+.leaderboard-table td:nth-child(2) {
+  width: auto;
+}
+.leaderboard-table .link-btn {
+  white-space: normal;
+  text-align: left;
+}
+
+/* Points total (col 3) — surbrillance + valeur accentuée */
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  background: rgba(255, 215, 0, 0.08);
+  color: #fff;
+  font-weight: 700;
+}
+.leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
+
+/* Séparateur avant "Points hier" (col 4) */
+.leaderboard-table th:nth-child(4),
+.leaderboard-table td:nth-child(4) {
+  border-left: 2px solid #2c3e70;
+}
+
+/* Chiffres alignés à droite pour compacter visuellement */
+.leaderboard-table td:nth-child(3),
+.leaderboard-table td:nth-child(4),
+.leaderboard-table td:nth-child(5) {
+  text-align: right;
+}
+
+/* =========================================================
+   MODE COMPACT MOBILE (≤ 768px)
+   ========================================================= */
+@media (max-width: 768px) {
+  /* On réduit légèrement la densité sans nuire à la lisibilité */
+  .leaderboard-table th,
+  .leaderboard-table td {
+    padding: 6px 8px;               /* padding réduit */
+    font-size: 14px;                /* police réduite */
+    line-height: 1.2;
+  }
+
+  /* L'en-tête peut prendre 2 lignes (grâce à white-space: normal) */
+  .leaderboard-table th { text-align: left; }
+
+  /* Très petits écrans (≤ 420px) : un cran de plus */
+  @media (max-width: 420px) {
+    .leaderboard-table th,
+    .leaderboard-table td {
+      padding: 5px 6px;
+      font-size: 13px;
+    }
+    /* Nom de pooler max 3 lignes avec ellipsis multi-lignes */
+    .leaderboard-table td:nth-child(2) .link-btn {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+}
+
+/* =========================================================
+   BADGE de synchro — en haut-droit + évite chevauchement
+   ========================================================= */
+.status-badge{
+  position: fixed; z-index: 10000;
+  top: 10px; right: 10px;           /* coin haut-droit */
+  left: auto; transform: none;
+}
+@media (max-width: 768px) {
+  body.has-status-badge { padding-top: 56px; }  /* réserve l’espace */
+}
