@@ -161,4 +161,21 @@ dialog .table tr:nth-child(even),
 .leaderboard-table td:nth-child(3) {
   padding-right: 10px;
 }
+/* Icône 🥇 dans l’en-tête "Points total" (3e colonne) */
+.leaderboard-table thead th:nth-child(3)::before {
+  content: "🥇 ";
+}
 
+/* Accessibilité : si tu veux un intitulé plus explicite au survol */
+.leaderboard-table thead th:nth-child(3) {
+  position: relative;
+}
+.leaderboard-table thead th:nth-child(3)::after {
+  content: "Points total";
+  /* rien d’affiché, mais utile si tu utilises un lecteur ou un style alt */
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px; height: 1px;
+  overflow: hidden;
+}
