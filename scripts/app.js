@@ -1336,15 +1336,16 @@ if (recomputeBtn) {
   if (draftSel) draftSel.addEventListener('change', renderRosterView);
 
   
-// 4) Auto‑refresh forcé pour VISITEUR (viewer) : toutes les 5 min
 
-const autoLabel = document.getElementById('auto-refresh')?.closest('label');
-if (autoLabel) autoLabel.style.display = 'none'; // on masque la case, plus d'option manuelle
+// 4) auto‑refresh pour TOUS (viewer + manager)
+  const autoLabel = document.getElementById('auto-refresh')?.closest('label');
+  if (autoLabel) autoLabel.style.display = 'none';
+  setInterval(() => {
+    refreshAllRemote()
+      .then(() => computeAndRender())
+      .catch(console.warn);
+  }, REFRESH_INTERVAL_MS);
 
-// Rafraîchit Poolers + Rosters + Stats toutes les 5 min pour TOUS (viewer et manager)
-setInterval(() => {
-  refreshAllRemote().catch(console.warn);
-}, REFRESH_INTERVAL_MS);
 
 
 }
