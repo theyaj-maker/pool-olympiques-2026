@@ -179,3 +179,29 @@ dialog .table tr:nth-child(even),
   width: 1px; height: 1px;
   overflow: hidden;
 }
+
+/* Container "carte" : marges plus compactes sur mobile */
+@media (max-width: 768px) {
+  .card { padding: 12px; margin: 10px 8px; }
+  h2, h3 { font-size: 1.05rem; }
+  label, input, select, button { font-size: 16px; } /* evite zoom iOS */
+  .grid-2 { display: block; } /* stack en 1 colonne */
+  .actions { flex-wrap: wrap; gap: 8px; }
+}
+
+/* Tables: scroll horizontal fluide sur mobile */
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 8px 10px; white-space: nowrap; }
+.table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.table thead, .table tbody, .table tr { display: table; width: 100%; table-layout: fixed; }
+
+/* Touch targets and buttons */
+button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
+
+/* Dialog plein écran en mobile si pas showModal natif */
+@media (max-width: 768px) {
+  dialog[open] {
+    width: 100vw; max-width: none;
+    height: 90vh; margin: 0; top: 5vh;
+  }
+}
