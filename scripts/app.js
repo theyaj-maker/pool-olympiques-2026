@@ -216,11 +216,11 @@ function bindGateUI() {
 function setStatus(level='ok', text=''){
   const badge = document.getElementById('status-badge');
   if (!badge) return;
-  badge.hidden = false;                // force l’affichage
+  badge.hidden = false;
   badge.classList.remove('ok','warn','err');
   badge.classList.add(level);
   badge.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${text || ' '}</span>`;
-  document.body.classList.add('has-status-badge');
+  document.body.classList.add('has-status-badge');  // <= important
 }
 function setStatusOK(summary='Synchro OK'){
   const ts = new Date().toLocaleTimeString();
@@ -1382,10 +1382,34 @@ function renderLeaderboard() {
   cont.innerHTML = '';
   cont.appendChild(table);
 
+  
+// ajuste les entêtes si petit écran
+compactLeaderboardHeadersIfSmall();
+
+
   // Click pour ouvrir la modale "Vue pooler"
   cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
     btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
+}
+
+function compactLeaderboardHeadersIfSmall(){
+  const isVerySmall = window.matchMedia && window.matchMedia('(max-width: 420px)').matches;
+  const tbl = document.querySelector('.leaderboard-table thead tr');
+  if (!tbl) return;
+  const ths = tbl.querySelectorAll('th');
+  if (ths.length < 5) return;
+
+  // th[2] = Points total, th[3] = Points hier, th[4] = Points aujourd’hui
+  if (isVerySmall) {
+    ths[2].innerHTML = '🥇 Pts total';
+    ths[3].textContent = 'Pts hier';
+    ths[4].textContent = 'Pts ajd';     // “aujourd’hui” abrégé
+  } else {
+    ths[2].innerHTML = '🥇 Points total';
+    ths[3].textContent = 'Points hier';
+    ths[4].textContent = 'Points aujourd’hui';
+  }
 }
 
 // =====================================================
@@ -1883,6 +1907,7 @@ if (clientRefreshBtn) {
 
 window.addEventListener('DOMContentLoaded', bootAuthThenApp);
 window.addEventListener('resize', placeLeaderboardFirstOnMobile, { passive: true });
+window.addEventListener('resize', compactLeaderboardHeadersIfSmall, { passive: true });
 placeLeaderboardFirstOnMobile();
 
 document.addEventListener('visibilitychange', function(){
