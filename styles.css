@@ -409,6 +409,10 @@ button, .btn-ghost { min-height: 36px; padding: 8px 12px; }
   .leaderboard-table th {
     text-align: left;
   }
+  
+.leaderboard-table td:nth-child(3),
+  .leaderboard-table td:nth-child(4),
+  .leaderboard-table td:nth-child(5) { text-align: right; }
 
   /* Ultra-compact (≤ 420px) : encore un cran de densité */
   @media (max-width: 420px) {
