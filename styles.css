@@ -75,3 +75,41 @@ footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}
 .link-btn:hover { color: #bfe3ff; }
 
 body[data-role="viewer"] .only-manager { display: none !important; }
+
+/* === Badge d’état (synchro) === */
+.status-badge{
+  position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+  display: inline-flex; gap: 8px; align-items: center;
+  padding: 6px 10px; border-radius: 999px; font-weight: 600;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); z-index: 10000;
+  background: #1d2a4a; color: #eaf3ff; border: 1px solid #385a9b;
+}
+.status-badge.ok   { background:#0d3a1d; border-color:#1c7a3b; color:#eafff2; }
+.status-badge.warn { background:#3a310d; border-color:#7a6a1c; color:#fff8e6; }
+.status-badge.err  { background:#3a0d0d; border-color:#7a1c1c; color:#ffecec; }
+.status-badge .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.status-badge.ok   .dot { background:#35d27a; }
+.status-badge.warn .dot { background:#e9c23a; }
+.status-badge.err  .dot { background:#ff6b6b; }
+
+/* === Toolbar client (bouton global refresh) === */
+.client-toolbar{
+  position: fixed; top: 56px; right: 12px; z-index: 9999;
+  display: flex; gap: 8px; align-items: center;
+}
+.btn-ghost{
+  background: transparent; border: 1px solid #5a6a9b; color: #cfe2ff;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+}
+.btn-ghost:hover{ background:#182544; }
+.btn-ghost.small{ font-size: 12px; padding: 4px 8px; }
+
+/* === Masquer toutes les actions d’édition côté viewer === */
+body[data-role="viewer"] .only-manager { display: none !important; }
+
+/* === Zébrage OFF dans les modales et partout où la classe no-zebra est appliquée === */
+dialog .table tr:nth-child(even),
+.no-zebra .table tr:nth-child(even),
+.table.no-zebra tr:nth-child(even){
+  background: transparent !important;
+}
