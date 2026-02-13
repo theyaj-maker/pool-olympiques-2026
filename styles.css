@@ -420,3 +420,58 @@ body[data-role="viewer"] .only-manager,
 body[data-role="viewer"] [data-role="manager-only"] {
   display: none !important;
 }
+/* ===== SAFEMODE CLASSEMENT — TABLE VISIBLE PARTOUT ===== */
+
+/* 1) Assure que le conteneur table est visible et que la version "cartes" est cachée */
+#leaderboard { display: block !important; }
+#leaderboard-cards { display: none !important; }
+
+/* 2) Wrapper pour scroller si ça déborde (mobile Safari/Chrome) */
+#leaderboard-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 3) Table compact lisible, entêtes multi-lignes */
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;            /* Laisse le navigateur gérer les largeurs */
+}
+.leaderboard-table th,
+.leaderboard-table td {
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: normal;           /* <- permet les retours à la ligne */
+  word-break: break-word;        /* <- casse les mots longs si besoin */
+}
+
+/* 4) Colonne # étroite, nombres alignés à droite */
+.leaderboard-table th:nth-child(1),
+.leaderboard-table td:nth-child(1) {
+  width: 36px; min-width: 36px; text-align: center;
+}
+.leaderboard-table td:nth-child(3),
+.leaderboard-table td:nth-child(4),
+.leaderboard-table td:nth-child(5) { text-align: right; }
+
+/* 5) Surbrillance & séparateur que tu voulais garder */
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  background: rgba(255,215,0,0.08);
+  color: #fff;
+  font-weight: 700;
+}
+.leaderboard-table td:nth-child(3) strong { color: #ffe27a; }
+.leaderboard-table th:nth-child(4),
+.leaderboard-table td:nth-child(4) { border-left: 2px solid #2c3e70; }
+
+/* 6) Badge synchro : coin haut-droit + réserve (évite chevauchement) */
+.status-badge{
+  position: fixed; z-index: 10000;
+  top: 10px; right: 10px; left: auto; transform: none;
+}
+body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile */
+
