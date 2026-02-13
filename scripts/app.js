@@ -1252,7 +1252,6 @@ function renderLeaderboard() {
   const cont = document.getElementById('leaderboard');
   if (!cont) return;
 
-  // Utilise le calcul enrichi (total + today + yesterday)
   let totals = [];
   try {
     totals = computeScoresWithDaily() || [];
@@ -1262,7 +1261,7 @@ function renderLeaderboard() {
   }
 
   const table = document.createElement('table');
-  table.classList.add('table');
+  table.classList.add('table', 'leaderboard-table'); // ⬅️ ajoute la classe ici
   table.innerHTML = `
     <thead>
       <tr>
@@ -1291,28 +1290,18 @@ function renderLeaderboard() {
         <td>${Number(r.today || 0).toFixed(1)}</td>`;
       tbody.appendChild(tr);
     });
-
-    // Note si tous à zéro (facultatif)
-    const allZero = totals.every(t => (t.points||0) === 0);
-    if (allZero) {
-      const note = document.createElement('tr');
-      note.innerHTML = `
-        <td colspan="5" class="muted">
-          Tous les scores sont à 0. Vérifie les rosters et l’URL <strong>Stats CSV</strong>.
-        </td>`;
-      tbody.appendChild(note);
-    }
   }
 
   table.appendChild(tbody);
   cont.innerHTML = '';
   cont.appendChild(table);
 
-  // Conserver l’ouverture de la modale "vue pooler"
+  // Click pour ouvrir la modale "Vue pooler"
   cont.querySelectorAll('[data-open-pooler]').forEach(btn => {
     btn.onclick = () => openPoolerModal(btn.getAttribute('data-open-pooler'));
   });
 }
+
 // =====================================================
 // CLASSEMENT – total + points "aujourd'hui" + "hier"
 // =====================================================
