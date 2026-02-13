@@ -326,35 +326,37 @@ async function loadPoolersFromCSV(url){
 
 async function refreshAllRemote(){
   const src = getRemoteSources();
-  const ops = [];
 
-  const fetchCSV = async (url, onText) => {
-    const r = await fetch(url, { cache: 'no-store' });
-    const txt = await r.text();
-    // Détection très simple du HTML
-    if (/^\s*</.test(txt) && /<html|<head|<body/i.test(txt)) {
-      console.warn('[CSV] HTML reçu au lieu de CSV →', url);
-      const banner = document.getElementById('last-update');
-      if (banner) banner.textContent = '⚠️ La source ne renvoie pas du CSV (vérifie la publication Google Sheets).';
-      return;
-    }
-    await onText(txt);
-  };
-
-  if (src.poolersUrl) ops.push(loadPoolersFromCSV(src.poolersUrl).catch(e => console.warn('Poolers CSV:', e.message||e)));
-  if (src.rostersUrl) ops.push(loadRostersFromCSV(src.rostersUrl).catch(e => console.warn('Rosters CSV:', e.message||e)));
-
-  // Stats: input UI si présent, sinon source mémorisée
-  const statsEl = document.getElementById('stats-url');
-  const statsUrl = (statsEl && statsEl.value) ? statsEl.value.trim() : (src.statsUrl || '');
-
-  if (statsUrl) {
-    ops.push(fetchCSV(statsUrl, ingestStatsFromCSVText).catch(e => console.warn('Stats CSV:', e.message||e)));
+  // 1) Poolers
+  if (src.poolersUrl) {
+    try { await loadPoolersFromCSV(src.poolersUrl); }
+    catch(e){ console.warn('Poolers CSV:', e.message||e); }
   }
 
-  await Promise.all(ops);
+  // 2) Rosters
+  if (src.rostersUrl) {
+    try { await loadRostersFromCSV(src.rostersUrl); }
+    catch(e){ console.warn('Rosters CSV:', e.message||e); }
+  }
+
+  // 3) Stats
+  const elS = document.getElementById('stats-url'); // champ manager si présent
+  const statsUrl = (elS && elS.value) ? elS.value.trim() : (src.statsUrl || '');
+  if (statsUrl) {
+    try {
+      const txt = await fetch(statsUrl, { cache:'no-store' }).then(r => r.text());
+      await ingestStatsFromCSVText(txt);
+    } catch(e){
+      console.warn('Stats CSV:', e.message||e);
+    }
+  }
+
+  // 4) Rendu
   computeAndRender();
 }
+
+// 🔓 expose pour tests console (modules ES ne mettent pas les fonctions en global)
+window.refreshAllRemote = refreshAllRemote;
 
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
