@@ -1015,21 +1015,23 @@ function renderRosterView() {
       <td>${p.team || ''}</td>
       <td>${p.box || ''}</td>
     `;
-    if (canEdit) {
-      const td = document.createElement('td');
-      const rm = document.createElement('button');
-      rm.className = 'secondary only-manager';
-      rm.textContent = 'Retirer';
-      rm.onclick = () => {
-        pl.players = (pl.players || []).filter(n => n !== p.name);
-        State.save(state);
-        renderPoolers();
-        renderRosterView();
-        computeAndRender();
-      };
-      td.appendChild(rm);
-      tr.appendChild(td);
-    }
+   
+if (canEdit) {
+  const td = document.createElement('td');
+  const rm = document.createElement('button');
+  rm.className = 'secondary only-manager';    // ⬅️ important
+  rm.textContent = 'Retirer';
+  rm.onclick = () => {
+    pl.players = (pl.players || []).filter(n => n !== p.name);
+    State.save(state);
+    renderPoolers();
+    renderRosterView();
+    computeAndRender();
+  };
+  td.appendChild(rm);
+  tr.appendChild(td);
+}
+
     tbody.appendChild(tr);
   });
 
