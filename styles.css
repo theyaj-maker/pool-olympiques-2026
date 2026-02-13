@@ -74,9 +74,9 @@ footer{max-width:1100px;margin:32px auto;padding:0 16px 24px;color:#9ab}
 }
 .link-btn:hover { color: #bfe3ff; }
 
-body[data-role="viewer"] .only-manager { display: none !important; }
 
-/* === Badge d’état (synchro) === */
+
+/* Badge : visible et lisible */
 .status-badge{
   position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
   display: inline-flex; gap: 8px; align-items: center;
@@ -92,6 +92,7 @@ body[data-role="viewer"] .only-manager { display: none !important; }
 .status-badge.warn .dot { background:#e9c23a; }
 .status-badge.err  .dot { background:#ff6b6b; }
 
+
 /* === Toolbar client (bouton global refresh) === */
 .client-toolbar{
   position: fixed; top: 56px; right: 12px; z-index: 9999;
@@ -104,8 +105,13 @@ body[data-role="viewer"] .only-manager { display: none !important; }
 .btn-ghost:hover{ background:#182544; }
 .btn-ghost.small{ font-size: 12px; padding: 4px 8px; }
 
+
 /* Cacher toutes les actions d’édition côté viewer */
-body[data-role="viewer"] .only-manager { display: none !important; }
+body[data-role="viewer"] .only-manager,
+body[data-role="viewer"] [data-role="manager-only"] {
+  display: none !important;
+}
+
 
 /* Désactiver le zébrage (alternance) dans les modales et zones marquées */
 dialog .table tr:nth-child(even),
