@@ -1183,44 +1183,52 @@ function bindStats() {
 // CLASSEMENT – calcul des points par pooler
 // =====================================================
 function computeScores() {
-  const s = state.scoring || { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
+  const s = state && state.scoring
+    ? state.scoring
+    : { goal: 1, assist: 1, goalie_win: 2, goalie_otl: 1, shutout: 3 };
+
   const out = [];
+  const poolers = Array.isArray(state?.poolers) ? state.poolers : [];
+  const statsByPlayer = state?.stats || {};
 
-  // Si aucun pooler, renvoyer tableau vide (le rendu gérera)
-  const poolers = state.poolers || [];
-  const statsByPlayer = state.stats || {};
+  poolers
+    .filter(pl => pl && pl.name)
+    .forEach(pl => {
+      const roster = Array.isArray(pl.players) ? pl.players.filter(Boolean) : [];
+      let sum = 0;
 
-  poolers.forEach(pl => {
-    const roster = pl.players || [];
-    let sum = 0;
-
-    roster.forEach(name => {
-      const days = statsByPlayer[name] || {};
-      // Somme toutes les dates disponibles pour ce joueur
-      Object.values(days).forEach(v => {
-        sum += (v.goals   || 0) * s.goal
-             + (v.assists || 0) * s.assist
-             + (v.win     || 0) * s.goalie_win
-             + (v.otl     || 0) * s.goalie_otl
-             + (v.so      || 0) * s.shutout;
+      roster.forEach(name => {
+        const days = statsByPlayer[name] || {};
+        Object.values(days).forEach(v => {
+          const goals = Number(v?.goals || 0);
+          const assists = Number(v?.assists || 0);
+          const win = Number(v?.win || 0);
+          const otl = Number(v?.otl || 0);
+          const so = Number(v?.so || 0);
+          sum += goals * s.goal
+              + assists * s.assist
+              + win * s.goalie_win
+              + otl * s.goalie_otl
+              + so * s.shutout;
+        });
       });
+
+      out.push({ pooler: pl.name, points: Number.isFinite(sum) ? sum : 0, rosterCount: roster.length });
     });
 
-    out.push({ pooler: pl.name, points: sum, rosterCount: roster.length });
-  });
+  out.sort((a, b) => (b.points - a.points) || a.pooler.localeCompare(b.pooler));
 
-  // Tri par points décroissants puis nom
-  out.sort((a, b) => b.points - a.points || a.pooler.localeCompare(b.pooler));
-
-  // Log utile 1x pour contrôler l’état
   try {
-    console.log('[computeScores] poolers=', out.map(t => `${t.pooler}(${t.rosterCount})`).join(', '),
-                'statsPlayers=', Object.keys(statsByPlayer).length);
+    console.log(
+      '[computeScores] poolers=',
+      out.map(t => `${t.pooler}(${t.rosterCount})`).join(', '),
+      'statsPlayers=',
+      Object.keys(statsByPlayer).length
+    );
   } catch (_) {}
 
   return out;
 }
-
 // Exposer pour debug en console (facultatif mais pratique)
 window.computeScores = computeScores;
 function renderLeaderboard() {
