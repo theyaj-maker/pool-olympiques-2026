@@ -117,3 +117,15 @@ body[data-role="viewer"] [data-role="manager-only"] {
 dialog .table tr:nth-child(even),
 .no-zebra .table tr:nth-child(even),
 .table.no-zebra tr:nth-child(even) { background: transparent !important; }
+
+/* Séparateur visuel après "Points total" dans le classement */
+.leaderboard-table th:nth-child(4),
+.leaderboard-table td:nth-child(4) {
+  border-left: 2px solid #2c3e70;   /* couleur de séparation (à ajuster) */
+}
+
+/* Optionnel : léger padding pour aérer côté droit de "Points total" */
+.leaderboard-table th:nth-child(3),
+.leaderboard-table td:nth-child(3) {
+  padding-right: 10px;
+}
