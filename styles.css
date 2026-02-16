@@ -525,5 +525,6 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
 /* (Facultatif) un peu d'espacement entre les cartes */
 #leaderboard-cards .lb-card { margin-bottom: 10px; }
 
-/* Badge MJ (optionnel, si tu veux sortir l'inline style) */
-.lb-badge.mj .dot { background:#4aa3ff; }
+/* Badges MJ spécifiques (si tu préfères éviter l'inline style) */
+.lb-badge.mj-total .dot  { background:#4aa3ff; }  /* bleu */
+.lb-badge.mj-today .dot  { background:#2ad1a0; }  /* vert-turquoise */
