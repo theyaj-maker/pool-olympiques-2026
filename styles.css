@@ -665,3 +665,27 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
   color: #d9e7ff;
 }
 .pl-today-section.F .pl-today .stat .v { color: #ffffff; }
+
+/* Badge compact dans la carte joueur pour "MJ (période)" */
+.pl-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0 0;
+}
+.pl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #10203f;
+  border: 1px solid #2b4374;
+  color: #cfe2ff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pl-chip .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; background: #4aa3ff; /* bleu (MJ période) */
+}
