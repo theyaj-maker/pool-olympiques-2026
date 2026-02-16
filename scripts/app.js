@@ -261,6 +261,28 @@ function __localISODate(d) {
 function __todayStr(){ return __localISODate(new Date()); }
 function __yesterdayStr(){ var y=new Date(); y.setDate(y.getDate()-1); return __localISODate(y); }
 
+// Compte les "matchs joués" pour un joueur sur une PÉRIODE (Du/Au)
+// Utilise la colonne "played" si présente, sinon fallback = 1 par date dans l'intervalle.
+function computePlayerMatchesInPeriod(playerName, fromStr, toStr) {
+  if (!playerName) return 0;
+  var days = (state && state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
+  var from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+  var toEff = toStr || (new Date().toISOString().slice(0,10));
+  var to = new Date(toEff + 'T23:59:59');
+
+  var count = 0;
+  var keys = Object.keys(days);
+  for (var i=0; i<keys.length; i++) {
+    var d = keys[i];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    var dt = new Date(d + 'T12:00:00');
+    if (from && dt < from) continue;
+    if (to && dt > to) continue;
+    var v = days[d] || {};
+    count += v.hasOwnProperty('played') ? (Number(v.played || 0)) : 1;
+  }
+  return count;
+}
 // Somme des "played" pour un pooler sur une date précise (fallback 1 si 'played' absent)
 function computePoolerMatchesOnDate(pooler, statsByPlayer, dateStr){
   if (!pooler || !pooler.players || !pooler.players.length) return 0;
@@ -1933,6 +1955,7 @@ function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
 
+    var mjPeriod = computePlayerMatchesInPeriod(r.name, fromStr, toStr);
     // Stats d'aujourd'hui (MJ + composantes)
     var today = getPlayerTodayStats(r.name);
     var ptsToday = today.goals * s.goal
@@ -1965,7 +1988,10 @@ var posClass = (pos === 'G') ? 'G' : (pos === 'D' ? 'D' : 'F');
         '<div class="stat"><span class="v">' + (r.so || 0) + '</span>SO</div>' +
         '<div class="stat" style="grid-column: span 3;"><span class="v">' + Number(r.points || 0).toFixed(1) + '</span>Points (période)</div>' +
       '</div>' +
-
+// --- Badge "MJ (période)" compact ---
+ '<div class="pl-badges">' +
+   '<div class="pl-chip"><span class="dot"></span> MJ (période)&nbsp;' + (mjPeriod || 0) + '</div>' +
+ '</div>' +
       // --- AUJOURD'HUI (COMPACT & VISUEL, par poste) ---
 '<div class="pl-today-section ' + posClass + '">' +
     '<div class="pl-today-ribbon">' +
