@@ -1961,12 +1961,16 @@ function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
         '<div class="stat" style="grid-column: span 3;"><span class="v">' + Number(r.points || 0).toFixed(1) + '</span>Points (période)</div>' +
       '</div>' +
 
-      // --- AUJOURD'HUI (COMPACT) : seulement MJ + Pts ---
-      '<div class="pl-today-title">Aujourd’hui</div>' +
-      '<div class="pl-today compact">' +
-        '<div class="stat"><span class="v">' + (today.played || 0) + '</span>MJ</div>' +
-        '<div class="stat"><span class="v">' + Number(ptsToday || 0).toFixed(1) + '</span>Pts</div>' +
-      '</div>' +
+      // --- AUJOURD'HUI (COMPACT & VISUEL) ---
+ '<div class="pl-today-section">'
+   '<div class="pl-today-ribbon">'
+     '<div class="pl-today-pill"><span class="dot"></span> Aujourd’hui</div>'
+   '</div>'
+   '<div class="pl-today">'   /* compact: 2 colonnes */
+     '<div class="stat"><span class="v">' + (today.played || 0) + '</span>MJ</div>'
+     '<div class="stat"><span class="v">' + Number(ptsToday || 0).toFixed(1) + '</span>Pts</div>'
+   '</div>'
+ '</div>' +
 
       // Bouton détail
       '<div class="actions" style="margin-top:8px;">' +
