@@ -553,94 +553,115 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
   display:flex; align-items:center; gap:8px;
 }
 
-/* Bloc "Aujourd'hui" COMPACT dans la carte joueur */
-.pl-today-title {
-  font-size: 12px;
-  color: #a8b5d7;
-  margin-top: 2px;
-  margin-bottom: 4px;
-}
-
-.pl-today {
-  display: grid;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.pl-today.compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr)); /* MJ | Pts uniquement */
-}
-
-.pl-today .stat {
-  background: #101b33;
-  border: 1px solid #263a66;
-  border-radius: 8px;
-  padding: 6px 8px;
-  text-align: center;
-  font-size: 13px;
-  color: #cfe2ff;
-}
-
-.pl-today .stat .v {
-  display: block;
-  font-weight: 800;
-  font-size: 16px;
-  color: #eaf3ff;
-}
-
-/* ===== Section AUJOURD'HUI (carte joueur) — visuel distinct ===== */
+/* ===== Section AUJOURD'HUI (carte joueur) — base commune ===== */
 .pl-today-section {
   margin-top: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(42, 209, 160, 0.35);  /* vert turquoise */
-  background: linear-gradient(180deg, rgba(42, 209, 160, 0.10) 0%, rgba(16, 27, 51, 0.70) 100%);
-  box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 0 0 1px rgba(42, 209, 160, 0.12);
-  overflow: hidden; /* pour arrondis propres avec le ruban */
+  overflow: hidden; /* arrondis pour le ruban */
 }
 
-/* Ruban d’en-tête "Aujourd’hui" */
+/* Ruban d’en-tête */
 .pl-today-ribbon {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 10px;
-  background: rgba(42, 209, 160, 0.15);
-  border-bottom: 1px solid rgba(42, 209, 160, 0.35);
+  border-bottom-width: 1px; border-bottom-style: solid;
 }
 
+/* Pastille du ruban */
 .pl-today-pill {
   display: inline-flex; align-items: center; gap: 6px;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(42, 209, 160, 0.15);
-  color: #baf5de;
-  border: 1px solid rgba(42, 209, 160, 0.35);
-  font-size: 12px;
-  font-weight: 700;
+  border: 1px solid;
+  font-size: 12px; font-weight: 700;
 }
 .pl-today-pill .dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: #2ad1a0; display: inline-block;
+  display: inline-block;
 }
 
-/* Contenu compact MJ | Pts (2 colonnes) */
+/* Contenu: MJ | Pts (compact 2 colonnes) */
 .pl-today {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 10px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px; padding: 10px;
 }
-
 .pl-today .stat {
-  background: #0f1a30;  /* plus sombre que le fond carte pour contraster */
-  border: 1px solid #2a426e;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   text-align: center;
-  color: #d9e7ff;
   font-size: 13px;
 }
 .pl-today .stat .v {
-  display: block;
-  font-weight: 800;
-  font-size: 18px;
-  color: #ffffff;
+  display: block; font-weight: 800; font-size: 18px; margin-bottom: 2px;
 }
+
+/* ===== VARIANTS PAR POSTE ===== */
+
+/* --- G (Gardien) : teal/vert --- */
+.pl-today-section.G {
+  border: 1px solid rgba(42, 209, 160, 0.40);
+  background: linear-gradient(180deg, rgba(42, 209, 160, 0.14) 0%, rgba(16, 27, 51, 0.80) 100%);
+  box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 0 0 1px rgba(42, 209, 160, 0.14);
+}
+.pl-today-section.G .pl-today-ribbon {
+  background: rgba(42, 209, 160, 0.18);
+  border-bottom-color: rgba(42, 209, 160, 0.45);
+}
+.pl-today-section.G .pl-today-pill {
+  background: rgba(42, 209, 160, 0.15);
+  border-color: rgba(42, 209, 160, 0.45);
+  color: #baf5de;
+}
+.pl-today-section.G .pl-today-pill .dot { background: #2ad1a0; }
+.pl-today-section.G .pl-today .stat {
+  background: #0f1f24;  /* bien contrasté */
+  border: 1px solid #1f5d57;
+  color: #d9fff3;
+}
+.pl-today-section.G .pl-today .stat .v { color: #ffffff; }
+
+/* --- D (Défenseur) : violet --- */
+.pl-today-section.D {
+  border: 1px solid rgba(164, 107, 255, 0.40);
+  background: linear-gradient(180deg, rgba(164, 107, 255, 0.16) 0%, rgba(16, 27, 51, 0.80) 100%);
+  box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 0 0 1px rgba(164, 107, 255, 0.14);
+}
+.pl-today-section.D .pl-today-ribbon {
+  background: rgba(164, 107, 255, 0.18);
+  border-bottom-color: rgba(164, 107, 255, 0.45);
+}
+.pl-today-section.D .pl-today-pill {
+  background: rgba(164, 107, 255, 0.15);
+  border-color: rgba(164, 107, 255, 0.45);
+  color: #e7d6ff;
+}
+.pl-today-section.D .pl-today-pill .dot { background: #a46bff; }
+.pl-today-section.D .pl-today .stat {
+  background: #171533;
+  border: 1px solid #4f3a86;
+  color: #efe8ff;
+}
+.pl-today-section.D .pl-today .stat .v { color: #ffffff; }
+
+/* --- F (Attaquant) : bleu --- */
+.pl-today-section.F {
+  border: 1px solid rgba(72, 147, 255, 0.40);
+  background: linear-gradient(180deg, rgba(72, 147, 255, 0.16) 0%, rgba(16, 27, 51, 0.80) 100%);
+  box-shadow: 0 6px 18px rgba(0,0,0,.25), inset 0 0 0 1px rgba(72, 147, 255, 0.14);
+}
+.pl-today-section.F .pl-today-ribbon {
+  background: rgba(72, 147, 255, 0.18);
+  border-bottom-color: rgba(72, 147, 255, 0.45);
+}
+.pl-today-section.F .pl-today-pill {
+  background: rgba(72, 147, 255, 0.15);
+  border-color: rgba(72, 147, 255, 0.45);
+  color: #d7e7ff;
+}
+.pl-today-section.F .pl-today-pill .dot { background: #4a93ff; }
+.pl-today-section.F .pl-today .stat {
+  background: #0f1a30;
+  border: 1px solid #2a426e;
+  color: #d9e7ff;
+}
+.pl-today-section.F .pl-today .stat .v { color: #ffffff; }
