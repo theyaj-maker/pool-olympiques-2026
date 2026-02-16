@@ -339,11 +339,8 @@ function renderLeaderboardCardsMobile() {
             '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
           '</div>' +
           '<div class="lb-sub">' +
-            // Badge "MJ totaux" (bleu) ajouté en premier
-            '<div class="lb-badge mj"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
-          
-// MJ aujourd'hui (point vert turquoise)
-        '<div class="lb-badge"><span class="dot" style="background:#2ad1a0"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
+            '<div class="lb-badge mj-total"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
+            '<div class="lb-badge mj-today"><span class="dot"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
 
             '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
             '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
@@ -575,10 +572,10 @@ async function loadRostersFromCSV(url){
   State.save(state);
 
   // Rendu
-  renderPoolers?.();
+  lers?.();
   refreshDraftPooler?.();
   renderRosterView?.();
-  renderPoolersCardsMobile();
+  lersCardsMobile();
   computeAndRender?.();
 }
 // Poolers CSV attendu : pooler,skaters,goalies
@@ -613,7 +610,7 @@ async function loadPoolersFromCSV(url){
 
   state.poolers = list;
   State.save(state);
-  renderPoolers();
+  lers();
   refreshDraftPooler();
   renderRosterView();
   computeAndRender();
@@ -830,7 +827,7 @@ function applyBoxDraft(){
 
   // Sauvegarde & rafraîchit
   State.save(state);
-  renderPoolers();
+  lers();
   renderRosterView();
   renderBoxDraftUI(); // regénère les menus (désactive ce qui vient d’être pris)
   computeAndRender();
@@ -1127,7 +1124,7 @@ function importPlayersFromCSV(text){
 }
 
 // --- Poolers & draft ---
-function renderPoolers(){
+function lers(){
   const cont = document.getElementById('poolers-list');
   if (!cont) return;
 
@@ -1161,7 +1158,7 @@ function renderPoolers(){
     del.onclick = () => {
       state.poolers = (state.poolers||[]).filter(x => x !== pl);
       State.save(state);
-      renderPoolers();
+      lers();
       refreshDraftPooler?.();
       renderRosterView?.();
       computeAndRender?.();
@@ -1175,10 +1172,10 @@ function renderPoolers(){
   table.appendChild(tbody);
   cont.innerHTML = '';
   cont.appendChild(table);
-  renderPoolersCardsMobile();
+  lersCardsMobile();
 }
 
-function renderPoolersCardsMobile(){
+function lersCardsMobile(){
   const cont = document.getElementById('poolers-cards');
   if (!cont) return;
 
@@ -1228,7 +1225,7 @@ function bindPoolers(){
     const sk = parseInt(qs('#roster-skaters').value)||0; const go = parseInt(qs('#roster-goalies').value)||0;
     if(state.poolers.find(p=>p.name.toLowerCase()===name.toLowerCase())) return alert('Pooler déjà existant');
     state.poolers.push({name, roster:{skaters: sk, goalies: go}, players: []});
-    State.save(state); qs('#pooler-name').value=''; renderPoolers(); refreshDraftPooler(); computeAndRender();
+    State.save(state); qs('#pooler-name').value=''; lers(); refreshDraftPooler(); computeAndRender();
   };
 }
 function refreshDraftPooler(){
@@ -1267,7 +1264,7 @@ function bindDraft(){
     pl.players.push(player.name);
     State.save(state);
     qs('#draft-player').value='';
-    renderPoolers(); renderRosterView(); computeAndRender();
+    lers(); renderRosterView(); computeAndRender();
   };
 }
 function renderRosterView() {
@@ -1321,9 +1318,9 @@ rm.setAttribute('data-role','manager-only');
   rm.onclick = () => {
     pl.players = (pl.players || []).filter(n => n !== p.name);
     State.save(state);
-    renderPoolers();
+    lers();
     renderRosterView();
-    renderPoolersCardsMobile();
+    lersCardsMobile();
     computeAndRender();
   };
   td.appendChild(rm);
@@ -1660,7 +1657,7 @@ function aggregatePoolerStats(poolerName, fromStr, toStr) {
 }
 
 
-function renderPoolerPlayersTable(poolerName, fromStr, toStr) {
+function lerPlayersTable(poolerName, fromStr, toStr) {
   const cont = document.getElementById('pooler-players-table');
   if (!cont) return;
 
@@ -1742,7 +1739,7 @@ cont.querySelectorAll('button[data-open-player]').forEach(function (btn) {
     const playerName = btn.getAttribute('data-open-player');
     const from = (document.getElementById('pooler-from')?.value) || '';
     const to   = (document.getElementById('pooler-to')?.value)   || '';
-    renderPoolerDailyTable(poolerName, playerName, from, to);
+    lerDailyTable(poolerName, playerName, from, to);
   };
 });
 
@@ -1753,7 +1750,7 @@ cont.querySelectorAll('button[data-open-player]').forEach(function (btn) {
   if (titleDaily) titleDaily.style.display = 'none';
   if (daily) daily.innerHTML = '';
 }
-function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
+function lerDailyTable(poolerName, playerName, fromStr, toStr) {
   const titleEl = document.getElementById('pooler-daily-title');
   const cont = document.getElementById('pooler-daily-table');
   if (!titleEl || !cont) return;
