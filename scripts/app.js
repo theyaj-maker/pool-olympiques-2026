@@ -253,48 +253,50 @@ function isMobile() {
   return ((w || dw) <= 768);
 }
 
-// Compte le nombre total de matchs du pooler (somme des "played" de tous ses joueurs)
-// Si "played" est absent pour une date, on considère 1 match par entrée de date.
+// ISO local YYYY-MM-DD
+function __localISODate(d) {
+  var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return t.toISOString().slice(0,10);
+}
+function __todayStr(){ return __localISODate(new Date()); }
+function __yesterdayStr(){ var y=new Date(); y.setDate(y.getDate()-1); return __localISODate(y); }
+
+// Somme des "played" pour un pooler sur une date précise (fallback 1 si 'played' absent)
+function computePoolerMatchesOnDate(pooler, statsByPlayer, dateStr){
+  if (!pooler || !pooler.players || !pooler.players.length) return 0;
+  var mj = 0, i, name, v;
+  for (i=0; i<pooler.players.length; i++){
+    name = pooler.players[i];
+    v = (statsByPlayer[name] && statsByPlayer[name][dateStr]) ? statsByPlayer[name][dateStr] : null;
+    if (v) mj += v.hasOwnProperty('played') ? (Number(v.played||0)) : 1;
+  }
+  return mj;
+}
+
+// Déjà existants chez toi (sinon ajoute-les) :
+// - total sur toutes les dates
 function computePoolerMatchesTotal(pooler, statsByPlayer) {
   if (!pooler || !pooler.players || !pooler.players.length) return 0;
-  var totalMJ = 0;
-  for (var i = 0; i < pooler.players.length; i++) {
-    var name = pooler.players[i];
-    var days = statsByPlayer[name] || {};
-    var dates = Object.keys(days);
-    for (var j = 0; j < dates.length; j++) {
-      var v = days[dates[j]] || {};
-      var played = (v.hasOwnProperty('played')) ? Number(v.played || 0) : 1;
-      totalMJ += played;
+  var totalMJ = 0, i, name, days, dates, j, v;
+  for (i = 0; i < pooler.players.length; i++) {
+    name = pooler.players[i];
+    days = statsByPlayer[name] || {};
+    dates = Object.keys(days);
+    for (j = 0; j < dates.length; j++) {
+      v = days[dates[j]] || {};
+      totalMJ += (v.hasOwnProperty('played')) ? Number(v.played || 0) : 1;
     }
   }
   return totalMJ;
 }
-
-// Compte les "MJ aujourd'hui" (somme des 'played' sur la date du jour pour tous les joueurs du pooler)
-// Fallback: s'il n'y a pas 'played' ce jour-là, chaque entrée compte pour 1.
+// - aujourd'hui
 function computePoolerMatchesToday(pooler, statsByPlayer) {
-  if (!pooler || !pooler.players || !pooler.players.length) return 0;
-
-  // Reutilise la logique locale (au fuseau du navigateur) pour todayStr
-  function localISODate(d) {
-    var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-    return t.toISOString().slice(0,10);
-  }
-  var todayStr = localISODate(new Date());
-
-  var mjToday = 0;
-  for (var i = 0; i < pooler.players.length; i++) {
-    var name = pooler.players[i];
-    var days = statsByPlayer[name] || {};
-    if (days.hasOwnProperty(todayStr)) {
-      var v = days[todayStr] || {};
-      mjToday += v.hasOwnProperty('played') ? (Number(v.played || 0)) : 1;
-    }
-  }
-  return mjToday;
+  return computePoolerMatchesOnDate(pooler, statsByPlayer, __todayStr());
 }
-
+// - hier (nouveau)
+function computePoolerMatchesYesterday(pooler, statsByPlayer) {
+  return computePoolerMatchesOnDate(pooler, statsByPlayer, __yesterdayStr());
+}
 function renderLeaderboardCardsMobile() {
   try {
     if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
@@ -326,29 +328,43 @@ function renderLeaderboardCardsMobile() {
           if (poolers[p] && poolers[p].name === r.pooler) { plObj = poolers[p]; break; }
         }
 
-        // Calcul "MJ totaux" (somme des 'played' de tous les joueurs)
-        var mjTotal = computePoolerMatchesTotal(plObj, statsByPlayer);
-        var mjToday = computePoolerMatchesToday(plObj, statsByPlayer);
+        
+// Calculs MJ
+    var mjTotal = computePoolerMatchesTotal(plObj, statsByPlayer);
+    var mjToday = computePoolerMatchesToday(plObj, statsByPlayer);
+    var mjYest  = computePoolerMatchesYesterday(plObj, statsByPlayer);
+
 
         var card = document.createElement('div');
         card.className = 'lb-card';
         
-card.innerHTML =
-  '<div class="lb-head">' +
-    '<div class="lb-rank">'+ (i+1) +'</div>' +
-    '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
-    '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
-  '</div>' +
-  '<div class="lb-sub">' +
-    // MJ totaux (bleu)
-    '<div class="lb-badge mj-total"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
-    // MJ aujourd’hui (vert)
-    '<div class="lb-badge mj-today"><span class="dot"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
-    // Points aujourd’hui (violet) — libellé clair
-    '<div class="lb-badge pts-today"><span class="dot"></span> Pts aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
-    // Points hier (orange)
-    '<div class="lb-badge pts-yest"><span class="dot"></span> Pts hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
-  '</div>';
+
+// Header : rang, nom (clic -> modale), bloc totaux à droite
+    var headHTML =
+      '<div class="lb-head">' +
+        '<div class="lb-rank">'+ (i+1) +'</div>' +
+        '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
+        '<div class="lb-totals">' +
+          '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
+          '<div class="lb-badge mj-total"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
+        '</div>' +
+      '</div>';
+
+    // Groupes jour : (MJ auj + Pts auj) et (MJ hier + Pts hier)
+    var groupsHTML =
+      '<div class="lb-groups">' +
+        '<div class="lb-row">' +
+          '<div class="lb-badge mj-today"><span class="dot"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
+          '<div class="lb-badge pts-today"><span class="dot"></span> Pts aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
+        '</div>' +
+        '<div class="lb-row">' +
+          '<div class="lb-badge mj-yest"><span class="dot"></span> MJ hier&nbsp;' + (mjYest || 0) + '</div>' +
+          '<div class="lb-badge pts-yest"><span class="dot"></span> Pts hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
+        '</div>' +
+      '</div>';
+
+    card.innerHTML = headHTML + groupsHTML;
+
 
         host.appendChild(card);
       }
