@@ -1981,6 +1981,7 @@ var posClass = (pos === 'G') ? 'G' : (pos === 'D' ? 'D' : 'F');
 
       // Statistiques agrégées (période)
       '<div class="pl-stats">' +
+        '<div class="stat"><span class="v">' + (mjPeriod || 0) + '</span>MJ (période)</div>' +
         '<div class="stat"><span class="v">' + (r.goals || 0) + '</span>Buts</div>' +
         '<div class="stat"><span class="v">' + (r.assists || 0) + '</span>Passes</div>' +
         '<div class="stat"><span class="v">' + (r.win || 0) + '</span>Win</div>' +
@@ -1988,10 +1989,7 @@ var posClass = (pos === 'G') ? 'G' : (pos === 'D' ? 'D' : 'F');
         '<div class="stat"><span class="v">' + (r.so || 0) + '</span>SO</div>' +
         '<div class="stat" style="grid-column: span 3;"><span class="v">' + Number(r.points || 0).toFixed(1) + '</span>Points (période)</div>' +
       '</div>' +
-// --- Badge "MJ (période)" compact ---
- '<div class="pl-badges">' +
-   '<div class="pl-chip"><span class="dot"></span> MJ (période)&nbsp;' + (mjPeriod || 0) + '</div>' +
- '</div>' +
+
       // --- AUJOURD'HUI (COMPACT & VISUEL, par poste) ---
 '<div class="pl-today-section ' + posClass + '">' +
     '<div class="pl-today-ribbon">' +
