@@ -253,9 +253,26 @@ function isMobile() {
   return ((w || dw) <= 768);
 }
 
+// Compte le nombre total de matchs du pooler (somme des "played" de tous ses joueurs)
+// Si "played" est absent pour une date, on considère 1 match par entrée de date.
+function computePoolerMatchesTotal(pooler, statsByPlayer) {
+  if (!pooler || !pooler.players || !pooler.players.length) return 0;
+  var totalMJ = 0;
+  for (var i = 0; i < pooler.players.length; i++) {
+    var name = pooler.players[i];
+    var days = statsByPlayer[name] || {};
+    var dates = Object.keys(days);
+    for (var j = 0; j < dates.length; j++) {
+      var v = days[dates[j]] || {};
+      var played = (v.hasOwnProperty('played')) ? Number(v.played || 0) : 1;
+      totalMJ += played;
+    }
+  }
+  return totalMJ;
+}
+
 function renderLeaderboardCardsMobile() {
   try {
-    // Conditions pour afficher les cartes
     if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
 
     var host    = document.getElementById('leaderboard-cards');
@@ -264,16 +281,30 @@ function renderLeaderboardCardsMobile() {
 
     host.innerHTML = '';
 
-    // Recalcule les scores (total + today + yest)
+    // Recalcule les scores
     var totals = [];
     try { totals = computeScoresWithDaily() || []; } catch(e){ console.warn(e); totals = []; }
 
-    // Rendu minimal si aucun pooler
+    // Accès aux stats pour le calcul MJ total
+    var statsByPlayer = (state && state.stats) ? state.stats : {};
+    // Accès à la liste des poolers pour retrouver l'objet pooler (players, roster)
+    var poolers = (state && state.poolers && state.poolers.length) ? state.poolers : [];
+
     if (!totals.length) {
       host.innerHTML = '<div class="lb-card"><em>Aucun pooler à afficher</em></div>';
     } else {
-      for (var i=0; i<totals.length; i++) {
+      for (var i = 0; i < totals.length; i++) {
         var r = totals[i];
+
+        // Retrouver l'objet pooler pour récupérer sa liste de joueurs
+        var plObj = null;
+        for (var p = 0; p < poolers.length; p++) {
+          if (poolers[p] && poolers[p].name === r.pooler) { plObj = poolers[p]; break; }
+        }
+
+        // Calcul "MJ totaux" (somme des 'played' de tous les joueurs)
+        var mjTotal = computePoolerMatchesTotal(plObj, statsByPlayer);
+
         var card = document.createElement('div');
         card.className = 'lb-card';
         card.innerHTML =
@@ -283,6 +314,8 @@ function renderLeaderboardCardsMobile() {
             '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
           '</div>' +
           '<div class="lb-sub">' +
+            // Badge "MJ totaux" (bleu) ajouté en premier
+            '<div class="lb-badge mj"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
             '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
             '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
           '</div>';
@@ -290,13 +323,13 @@ function renderLeaderboardCardsMobile() {
       }
     }
 
-    // Si on a bien quelque chose dans host, bascule en “cartes”, sinon garde “table”
+    // Si le rendu a produit quelque chose -> bascule "cards", sinon reste "table"
     if (host.children.length > 0) showLeaderboardMode('cards');
     else                          showLeaderboardMode('table');
 
     // Clic -> modale
     var btns = host.querySelectorAll('[data-open-pooler]');
-    for (var j=0; j<btns.length; j++) {
+    for (var j = 0; j < btns.length; j++) {
       (function(b){
         b.onclick = function(){ openPoolerModal(b.getAttribute('data-open-pooler')); };
       })(btns[j]);
@@ -306,7 +339,6 @@ function renderLeaderboardCardsMobile() {
     showLeaderboardMode('table');
   }
 }
-
 function showLeaderboardMode(mode){
   var wrap  = document.getElementById('leaderboard-wrap');
   var tbl   = document.getElementById('leaderboard');
