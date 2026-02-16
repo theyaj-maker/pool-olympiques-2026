@@ -1941,6 +1941,11 @@ function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
                  + today.otl * (s.goalie_otl || 0)
                  + today.so * s.shutout;
 
+    
+// Détermine la classe de poste (G / D / F), F par défaut
+var pos = (r.position || '').toUpperCase();
+var posClass = (pos === 'G') ? 'G' : (pos === 'D' ? 'D' : 'F');
+
     var c = document.createElement('div');
     c.className = 'pl-card';
 
@@ -1961,16 +1966,16 @@ function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
         '<div class="stat" style="grid-column: span 3;"><span class="v">' + Number(r.points || 0).toFixed(1) + '</span>Points (période)</div>' +
       '</div>' +
 
-      // --- AUJOURD'HUI (COMPACT & VISUEL) ---
- '<div class="pl-today-section">'
-   '<div class="pl-today-ribbon">'
-     '<div class="pl-today-pill"><span class="dot"></span> Aujourd’hui</div>'
-   '</div>'
-   '<div class="pl-today">'   /* compact: 2 colonnes */
-     '<div class="stat"><span class="v">' + (today.played || 0) + '</span>MJ</div>'
-     '<div class="stat"><span class="v">' + Number(ptsToday || 0).toFixed(1) + '</span>Pts</div>'
-   '</div>'
- '</div>' +
+      // --- AUJOURD'HUI (COMPACT & VISUEL, par poste) ---
+'<div class="pl-today-section ' + posClass + '">' +
+    '<div class="pl-today-ribbon">' +
+      '<div class="pl-today-pill"><span class="dot"></span> Aujourd’hui</div>' +
+    '</div>' +
+    '<div class="pl-today">' +
+      '<div class="stat"><span class="v">' + (today.played || 0) + '</span>MJ</div>' +
+      '<div class="stat"><span class="v">' + Number(ptsToday || 0).toFixed(1) + '</span>Pts</div>' +
+    '</div>' +
+  '</div>' +
 
       // Bouton détail
       '<div class="actions" style="margin-top:8px;">' +
