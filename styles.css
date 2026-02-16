@@ -553,13 +553,24 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
   display:flex; align-items:center; gap:8px;
 }
 
-/* Groupe "Aujourd'hui" dans la carte joueur (mobile) */
+/* Bloc "Aujourd'hui" COMPACT dans la carte joueur */
+.pl-today-title {
+  font-size: 12px;
+  color: #a8b5d7;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
 .pl-today {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0,1fr));
   gap: 8px;
   margin-top: 8px;
 }
+
+.pl-today.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); /* MJ | Pts uniquement */
+}
+
 .pl-today .stat {
   background: #101b33;
   border: 1px solid #263a66;
@@ -569,17 +580,10 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
   font-size: 13px;
   color: #cfe2ff;
 }
+
 .pl-today .stat .v {
   display: block;
   font-weight: 800;
   font-size: 16px;
   color: #eaf3ff;
-}
-
-/* Petit tag en en-tête "Aujourd'hui" */
-.pl-today-title {
-  font-size: 12px;
-  color: #a8b5d7;
-  margin-top: 2px;
-  margin-bottom: 4px;
 }
