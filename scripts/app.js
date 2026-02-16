@@ -1906,6 +1906,9 @@ function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
   cont.appendChild(table);
 }
 
+// Helpers requis : __todayStr(), getPlayerTodayStats(), showModalListsMode(), renderPoolerDailyTable(), renderPoolerDailyCards()
+// (tu les as déjà d’après les patches précédents)
+
 function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
   if (!SAFE_MOBILE_CARDS || !isMobile()) { showModalListsMode('table'); return; }
 
@@ -1913,52 +1916,100 @@ function renderPoolerPlayersCards(poolerName, fromStr, toStr) {
   if (!host) return;
   host.innerHTML = '';
 
+  // Bascule la modale en mode cartes
+  showModalListsMode('cards');
+
+  // Données agrégées (période filtrée)
   var rows = (aggregatePoolerStats(poolerName, fromStr, toStr) || []);
+
   if (!rows.length) {
     host.innerHTML = '<div class="pl-card"><em>Aucun joueur dans la période.</em></div>';
-  } else {
-    for (var i=0; i<rows.length; i++) {
-      var r = rows[i];
-      var mj = countMatches(r.name, fromStr, toStr);
-      var c = document.createElement('div');
-      c.className = 'pl-card';
-      c.innerHTML =
-        '<div class="pl-head">' +
-          '<div class="pl-name">'+ r.name +'</div>' +
-          '<div class="pl-meta">'+ (r.position||'') + (r.team ? ' · ' + r.team : '') +'</div>' +
-        '</div>' +
-        '<div class="pl-stats">' +
-          '<div class="stat"><span class="v">'+ (mj||0) +'</span>MJ</div>' +
-          '<div class="stat"><span class="v">'+ (r.goals||0) +'</span>Buts</div>' +
-          '<div class="stat"><span class="v">'+ (r.assists||0) +'</span>Passes</div>' +
-          '<div class="stat"><span class="v">'+ (r.win||0) +'</span>Win</div>' +
-          '<div class="stat"><span class="v">'+ (r.otl||0) +'</span>OTL</div>' +
-          '<div class="stat"><span class="v">'+ (r.so||0) +'</span>SO</div>' +
-          '<div class="stat" style="grid-column: span 3;"><span class="v">'+ Number(r.points||0).toFixed(1) +'</span>Points</div>' +
-        '</div>' +
-        '<div class="actions" style="margin-top:8px;"><button class="secondary" data-open-player="'+ r.name +'">Voir le détail</button></div>';
-      host.appendChild(c);
-    }
+    return;
   }
 
-  if (host.children.length > 0) showModalListsMode('cards');
+  // Scoring pour calcul des points d'aujourd'hui
+  var s = (state && state.scoring) ? state.scoring : { goal:1, assist:1, goalie_win:2, goalie_otl:1, shutout:3 };
 
-  // Détail quotidien (cartes)
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+
+    // Stats d'aujourd'hui (MJ + composantes)
+    var today = getPlayerTodayStats(r.name);
+    var ptsToday = today.goals * s.goal
+                 + today.assists * s.assist
+                 + today.win * s.goalie_win
+                 + today.otl * (s.goalie_otl || 0)
+                 + today.so * s.shutout;
+
+    var c = document.createElement('div');
+    c.className = 'pl-card';
+
+    c.innerHTML =
+      // En-tête : nom + meta
+      '<div class="pl-head">' +
+        '<div class="pl-name">' + r.name + '</div>' +
+        '<div class="pl-meta">' + (r.position || '') + (r.team ? ' · ' + r.team : '') + '</div>' +
+      '</div>' +
+
+      // Statistiques agrégées (période)
+      '<div class="pl-stats">' +
+        '<div class="stat"><span class="v">' + (r.goals || 0) + '</span>Buts</div>' +
+        '<div class="stat"><span class="v">' + (r.assists || 0) + '</span>Passes</div>' +
+        '<div class="stat"><span class="v">' + (r.win || 0) + '</span>Win</div>' +
+        '<div class="stat"><span class="v">' + (r.otl || 0) + '</span>OTL</div>' +
+        '<div class="stat"><span class="v">' + (r.so || 0) + '</span>SO</div>' +
+        '<div class="stat" style="grid-column: span 3;"><span class="v">' + Number(r.points || 0).toFixed(1) + '</span>Points (période)</div>' +
+      '</div>' +
+
+      // --- AUJOURD'HUI (COMPACT) : seulement MJ + Pts ---
+      '<div class="pl-today-title">Aujourd’hui</div>' +
+      '<div class="pl-today compact">' +
+        '<div class="stat"><span class="v">' + (today.played || 0) + '</span>MJ</div>' +
+        '<div class="stat"><span class="v">' + Number(ptsToday || 0).toFixed(1) + '</span>Pts</div>' +
+      '</div>' +
+
+      // Bouton détail
+      '<div class="actions" style="margin-top:8px;">' +
+        '<button class="secondary" data-open-player="' + r.name + '">Voir le détail</button>' +
+      '</div>';
+
+    host.appendChild(c);
+  }
+
+  // (Re)lier les boutons "Voir le détail" — compatible Safari
   var btns = host.querySelectorAll('[data-open-player]');
-  for (var j=0; j<btns.length; j++) {
-    (function(b){
-      b.onclick = function(){
-        var name = b.getAttribute('data-open-player');
-        var fEl = document.getElementById('pooler-from');
-        var tEl = document.getElementById('pooler-to');
-        var f = fEl ? fEl.value : '';
-        var t = tEl ? tEl.value : '';
-        renderPoolerDailyCards(poolerName, name, f, t);
+  for (var j = 0; j < btns.length; j++) {
+    (function (b) {
+      b.onclick = function () {
+        var playerName = b.getAttribute('data-open-player');
+        var fromEl = document.getElementById('pooler-from');
+        var toEl   = document.getElementById('pooler-to');
+        var from = fromEl ? fromEl.value : '';
+        var to   = toEl   ? toEl.value   : '';
+
+        // Détail en table
+        if (typeof renderPoolerDailyTable === 'function') {
+          renderPoolerDailyTable(poolerName, playerName, from, to);
+        }
+        // Détail en cartes
+        if (typeof renderPoolerDailyCards === 'function') {
+          renderPoolerDailyCards(poolerName, playerName, from, to);
+        }
+
+        // Assure la visibilité du bloc "détail" (mode cartes)
+        showModalListsMode('cards');
+        var title = document.getElementById('pooler-daily-title');
+        if (title) { title.style.display = ''; }
+
+        // Scroll vers le détail pour le rendre visible
+        var dailyCards = document.getElementById('pooler-daily-cards');
+        if (dailyCards && typeof dailyCards.scrollIntoView === 'function') {
+          setTimeout(function(){ dailyCards.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+        }
       };
     })(btns[j]);
   }
 }
-
 function renderPoolerDailyCards(poolerName, playerName, fromStr, toStr) {
   if (!SAFE_MOBILE_CARDS || !isMobile()) { showModalListsMode('table'); return; }
 
