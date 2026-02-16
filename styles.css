@@ -525,19 +525,30 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
 /* (Facultatif) un peu d'espacement entre les cartes */
 #leaderboard-cards .lb-card { margin-bottom: 10px; }
 
-/* Badges dans les cartes du classement : couleurs distinctes */
+/* Badges (couleurs distinctes) */
 .lb-badge .dot { width: 8px; height: 8px; border-radius: 50%; display:inline-block; }
 
 /* MJ */
-.lb-badge.mj-total .dot  { background:#4aa3ff; }  /* bleu */
-.lb-badge.mj-today .dot  { background:#2ad1a0; }  /* vert */
+.lb-badge.mj-total  .dot { background:#4aa3ff; }  /* bleu */
+.lb-badge.mj-today  .dot { background:#2ad1a0; }  /* vert */
+.lb-badge.mj-yest   .dot { background:#16c1ff; }  /* cyan */
 
 /* Points */
 .lb-badge.pts-today .dot { background:#a46bff; }  /* violet */
 .lb-badge.pts-yest  .dot { background:#ff9a3a; }  /* orange */
 
-/* Optionnel : un très léger fond par type (si tu veux renforcer la différence) */
+/* Option : fond léger pour différencier encore plus */
 .lb-badge.mj-total  { background: rgba(74,163,255,0.12);  border-color: rgba(74,163,255,0.35); }
 .lb-badge.mj-today  { background: rgba(42,209,160,0.12);  border-color: rgba(42,209,160,0.35); }
+.lb-badge.mj-yest   { background: rgba(22,193,255,0.12);  border-color: rgba(22,193,255,0.35); }
 .lb-badge.pts-today { background: rgba(164,107,255,0.12); border-color: rgba(164,107,255,0.35); }
 .lb-badge.pts-yest  { background: rgba(255,154,58,0.12);  border-color: rgba(255,154,58,0.35); }
+
+/* Groupes (aujourd'hui / hier) alignés compacts */
+.lb-groups { display:flex; flex-direction: column; gap: 6px; }
+.lb-row    { display:flex; flex-wrap: wrap; gap: 8px; }
+
+/* Bloc totaux à droite (Points total + MJ totaux) */
+.lb-totals {
+  display:flex; align-items:center; gap:8px;
+}
