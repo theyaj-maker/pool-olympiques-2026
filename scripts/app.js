@@ -332,22 +332,24 @@ function renderLeaderboardCardsMobile() {
 
         var card = document.createElement('div');
         card.className = 'lb-card';
-        card.innerHTML =
-          '<div class="lb-head">' +
-            '<div class="lb-rank">'+ (i+1) +'</div>' +
-            '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
-            '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
-          '</div>' +
-          '<div class="lb-sub">' +
-            // Badge "MJ totaux" (bleu) ajouté en premier
-            '<div class="lb-badge mj"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
-          
-'<div class="lb-badge mj-total"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
-'<div class="lb-badge mj-today"><span class="dot"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
+        
+card.innerHTML =
+  '<div class="lb-head">' +
+    '<div class="lb-rank">'+ (i+1) +'</div>' +
+    '<div class="lb-name"><button class="link-btn" data-open-pooler="' + r.pooler + '">' + r.pooler + '</button></div>' +
+    '<div class="lb-total">🥇 ' + Number(r.points||0).toFixed(1) + '</div>' +
+  '</div>' +
+  '<div class="lb-sub">' +
+    // MJ totaux (bleu)
+    '<div class="lb-badge mj-total"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
+    // MJ aujourd’hui (vert)
+    '<div class="lb-badge mj-today"><span class="dot"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
+    // Points aujourd’hui (violet) — libellé clair
+    '<div class="lb-badge pts-today"><span class="dot"></span> Pts aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
+    // Points hier (orange)
+    '<div class="lb-badge pts-yest"><span class="dot"></span> Pts hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
+  '</div>';
 
-            '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
-            '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
-          '</div>';
         host.appendChild(card);
       }
     }
