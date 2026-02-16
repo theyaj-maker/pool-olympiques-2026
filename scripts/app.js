@@ -1771,6 +1771,23 @@ cont.querySelectorAll('button[data-open-player]').forEach(function (btn) {
   if (titleDaily) titleDaily.style.display = 'none';
   if (daily) daily.innerHTML = '';
 }
+// Retourne l'objet stats du joueur pour "aujourd'hui" (ou un fallback vide)
+function getPlayerTodayStats(playerName) {
+  var today = __todayStr();
+  var days = (state && state.stats && state.stats[playerName]) ? state.stats[playerName] : {};
+  var v = days[today] || {};
+  // Valeurs numériques sûres + played fallback = 1 si entrée présente sans 'played'
+  var hasEntry = days.hasOwnProperty(today);
+  return {
+    played: hasEntry ? (v.hasOwnProperty('played') ? Number(v.played || 0) : 1) : 0,
+    goals:  Number(v.goals  || 0),
+    assists:Number(v.assists|| 0),
+    win:    Number(v.win    || 0),
+    otl:    Number(v.otl    || 0),
+    so:     Number(v.so     || 0)
+  };
+}
+
 function renderPoolerDailyTable(poolerName, playerName, fromStr, toStr) {
   const titleEl = document.getElementById('pooler-daily-title');
   const cont = document.getElementById('pooler-daily-table');
