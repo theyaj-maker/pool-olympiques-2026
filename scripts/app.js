@@ -271,6 +271,30 @@ function computePoolerMatchesTotal(pooler, statsByPlayer) {
   return totalMJ;
 }
 
+// Compte les "MJ aujourd'hui" (somme des 'played' sur la date du jour pour tous les joueurs du pooler)
+// Fallback: s'il n'y a pas 'played' ce jour-là, chaque entrée compte pour 1.
+function computePoolerMatchesToday(pooler, statsByPlayer) {
+  if (!pooler || !pooler.players || !pooler.players.length) return 0;
+
+  // Reutilise la logique locale (au fuseau du navigateur) pour todayStr
+  function localISODate(d) {
+    var t = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return t.toISOString().slice(0,10);
+  }
+  var todayStr = localISODate(new Date());
+
+  var mjToday = 0;
+  for (var i = 0; i < pooler.players.length; i++) {
+    var name = pooler.players[i];
+    var days = statsByPlayer[name] || {};
+    if (days.hasOwnProperty(todayStr)) {
+      var v = days[todayStr] || {};
+      mjToday += v.hasOwnProperty('played') ? (Number(v.played || 0)) : 1;
+    }
+  }
+  return mjToday;
+}
+
 function renderLeaderboardCardsMobile() {
   try {
     if (!SAFE_MOBILE_CARDS || !isMobile()) { showLeaderboardMode('table'); return; }
@@ -304,6 +328,7 @@ function renderLeaderboardCardsMobile() {
 
         // Calcul "MJ totaux" (somme des 'played' de tous les joueurs)
         var mjTotal = computePoolerMatchesTotal(plObj, statsByPlayer);
+        var mjToday = computePoolerMatchesToday(plObj, statsByPlayer);
 
         var card = document.createElement('div');
         card.className = 'lb-card';
@@ -316,6 +341,10 @@ function renderLeaderboardCardsMobile() {
           '<div class="lb-sub">' +
             // Badge "MJ totaux" (bleu) ajouté en premier
             '<div class="lb-badge mj"><span class="dot"></span> MJ totaux&nbsp;' + (mjTotal || 0) + '</div>' +
+          
+// MJ aujourd'hui (point vert turquoise)
+        '<div class="lb-badge"><span class="dot" style="background:#2ad1a0"></span> MJ aujourd’hui&nbsp;' + (mjToday || 0) + '</div>' +
+
             '<div class="lb-badge today"><span class="dot"></span> Aujourd’hui&nbsp;' + Number(r.today||0).toFixed(1) + '</div>' +
             '<div class="lb-badge yest"><span class="dot"></span> Hier&nbsp;' + Number(r.yest||0).toFixed(1) + '</div>' +
           '</div>';
