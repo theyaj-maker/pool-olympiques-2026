@@ -2371,6 +2371,17 @@ window.addEventListener('resize', renderLeaderboardCardsMobile, { passive: true 
 window.addEventListener('orientationchange', renderLeaderboardCardsMobile, { passive: true });
 placeLeaderboardFirstOnMobile();
 
+function placeBracketAfterLeaderboard(){
+  var main = document.querySelector('main') || document.body;
+  var lb = document.getElementById('leaderboard-section');
+  var br = document.getElementById('bracket-section');
+  if (main && lb && br && lb.nextSibling !== br) {
+    main.insertBefore(br, lb.nextSibling);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', placeBracketAfterLeaderboard);
+
 
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') {
