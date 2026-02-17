@@ -449,6 +449,95 @@ function countMatches(playerName, fromStr, toStr){
   return mj;
 }
 
+// === CONFIG "hardcodée" ===
+var NHL_BRACKET_PAGE = 'https://www.nhl.com/events/olympic-winter-games-milano-cortina-2026/';
+var NHL_BRACKET_ELEMENT_ID = 'fl-layout-wrapper-outer';
+
+// OPTION RECOMMANDÉE: déploie l’Apps Script ci-dessous et mets son URL ici
+var BRACKET_PROXY = 'https://script.google.com/macros/s/AKfycby1Ff8uLcaUwZdNusnNvaR-YjzjGKVd-BytJXCTakSmXWYoc8JLjK5CqiwBwL7ipTjX/exec'; // ex: 'https://script.google.com/macros/s/XXXXXX/exec'
+
+// --- DOM utils ---
+function $(id){ return document.getElementById(id); }
+
+// Sanitisation basique: enlève <script>, <iframe> et attributs on* (onclick, …)
+function sanitizeFragment(root) {
+  try {
+    var scripts = root.querySelectorAll('script, iframe');
+    var i;
+    for (i=0;i<scripts.length;i++){ scripts[i].parentNode.removeChild(scripts[i]); }
+
+    var all = root.getElementsByTagName('*');
+    for (i=0;i<all.length;i++){
+      var atts = all[i].attributes; if (!atts) continue;
+      var j, remove = [];
+      for (j=0;j<atts.length;j++){
+        if (/^on/i.test(atts[j].name)) remove.push(atts[j].name);
+      }
+      for (j=0;j<remove.length;j++){ all[i].removeAttribute(remove[j]); }
+    }
+  } catch(e){}
+  return root;
+}
+
+// Chargement via proxy Apps Script
+function fetchNhlBracketViaProxy(url){
+  var prox = BRACKET_PROXY;
+  if (!prox) return Promise.reject(new Error('no-proxy'));
+  var final = prox + '?url=' + encodeURIComponent(url);
+  return fetch(final, { cache:'no-store' }).then(function(r){ return r.text(); });
+}
+
+// Fallback: iframe de la page complète (si framing autorisé)
+function showNhlBracketIframeFallback(){
+  var wrap = $('nhl-bracket-iframe-wrap'), iframe = $('nhl-bracket-iframe');
+  if (!wrap || !iframe) return;
+  wrap.style.display = 'block';
+  iframe.src = NHL_BRACKET_PAGE;
+  var empty = $('nhl-bracket-empty');
+  if (empty){ empty.style.display = 'none'; }
+}
+
+// Rendu principal
+function renderNhlBracket() {
+  var host = $('nhl-bracket-embed');
+  var empty = $('nhl-bracket-empty');
+  var open = $('nhl-bracket-open');
+  if (!host || !empty) return;
+
+  if (open) { open.href = NHL_BRACKET_PAGE; }
+
+  // squelette
+  host.className = (host.className||'') + ' loading';
+  empty.style.display = 'none';
+
+  // 1) Essayer via proxy (recommandé)
+  fetchNhlBracketViaProxy(NHL_BRACKET_PAGE)
+    .then(function(html){
+      // Parser le HTML renvoyé
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var frag = doc.getElementById(NHL_BRACKET_ELEMENT_ID);
+      if (!frag) throw new Error('element-not-found');
+
+      // Sanitize + inject
+      frag = sanitizeFragment(frag.cloneNode(true));
+      host.innerHTML = '';
+      host.appendChild(frag);
+      host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
+    })
+    .catch(function(err){
+      // 2) Si pas de proxy (ou erreur), tenter l’iframe
+      host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
+      // Si pas de proxy configuré, on essaye l’iframe
+      if (String(err && err.message) === 'no-proxy') {
+        showNhlBracketIframeFallback();
+        return;
+      }
+      // Si le site refuse l’iframe, afficher le lien
+      empty.style.display = '';
+    });
+}
+
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
  *  - Poolers : pooler,skaters,goalies
@@ -2204,6 +2293,8 @@ if (document.getElementById('players-list')) {
   renderBoxDraftUI();         bindBoxDraft();
   bindStats();                bindRemoteSourcesUI();
   computeAndRender();
+
+  renderNhlBracket();
   renderPoolersCardsMobile();
   renderLeaderboardCardsMobile();
 
@@ -2227,6 +2318,7 @@ if (recomputeBtn) {
     const sp = Object.keys(state.stats||{}).length;
     setStatusOK(`Players: ${p} · Poolers: ${pl} · Stats-joueurs: ${sp}`);
     computeAndRender();
+    renderNhlBracket(); // rafraîchit le bracket
   } catch (e) {
     console.warn('auto-refresh error:', e);
     setStatusErr('Erreur de synchronisation (auto)');
