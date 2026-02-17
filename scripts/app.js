@@ -1648,8 +1648,86 @@ function bindLeagueIO(){
 function computeAndRender(){
   
 renderLeaderboard();
+  // Si tu as une fonction de boot/rendu global, rebinde aussi après
+// ex: à la fin de computeAndRender()
+(function(){
+  var _old = typeof computeAndRender === 'function' ? computeAndRender : null;
+  if (_old && !_old.__wrappedForClientRefresh){
+    computeAndRender = function(){
+      try { _old(); } finally { bindClientRefresh(); }
+    };
+    computeAndRender.__wrappedForClientRefresh = true;
+  }
+})();
 }
 window.computeAndRender = computeAndRender; // debug console
+
+// --- Helpers "safe" pour logs compacts ---
+function __logRefresh(msg){
+  try { console.log('[client-refresh]', msg); } catch(e){}
+}
+
+// --- Binding robuste du bouton "Rafraîchir" (client) ---
+function bindClientRefresh() {
+  var btn = document.getElementById('client-refresh');
+  if (!btn) { __logRefresh('bouton introuvable'); return; }
+
+  // Ne pas dupliquer les handlers si re-bind
+  if (btn.__boundRefresh) { __logRefresh('déjà bind'); return; }
+  btn.__boundRefresh = true;
+
+  // Handler commun
+  function doRefresh(ev){
+    try { ev && ev.preventDefault && ev.preventDefault(); } catch(_){}
+    try { ev && ev.stopPropagation && ev.stopPropagation(); } catch(_){}
+
+    // Si la page n’est pas visible (iOS en arrière-plan), on fait rien
+    if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'visible') {
+      __logRefresh('ignoré (onglet non visible)');
+      return;
+    }
+
+    // Visuel badge si tu utilises setStatus*
+    if (typeof setStatusWarn === 'function') setStatusWarn('Rafraîchissement…');
+
+    __logRefresh('début');
+    // No-cache côté fetch (ton refreshAllRemote le fait déjà normalement)
+    Promise.resolve()
+      .then(function(){ return refreshAllRemote(); })
+      .then(function(){
+        if (typeof computeAndRender === 'function') computeAndRender();
+        // Stats de rendu
+        var p  = (state && state.players) ? state.players.length : 0;
+        var pl = (state && state.poolers) ? state.poolers.length : 0;
+        var sp = (state && state.stats) ? Object.keys(state.stats).length : 0;
+        __logRefresh('OK players='+p+' poolers='+pl+' statsPlayers='+sp);
+        if (typeof setStatusOK === 'function') setStatusOK('Players: '+p+' · Poolers: '+pl+' · Stats: '+sp);
+      })
+      .catch(function(e){
+        console.warn('client refresh error:', e);
+        if (typeof setStatusErr === 'function') setStatusErr('Erreur durant le rafraîchissement');
+      });
+  }
+
+  // Événements : click (desktop) + touchend (iOS) + key (entrée/espace)
+  btn.addEventListener('click', doRefresh, false);
+  btn.addEventListener('touchend', doRefresh, false);
+  btn.addEventListener('keydown', function(ev){
+    var k = ev && ev.keyCode;
+    if (k === 13 || k === 32) doRefresh(ev); // Enter / Space
+  }, false);
+
+  // S'assurer que le bouton est focusable
+  btn.setAttribute('tabindex', '0');
+
+  __logRefresh('bind OK');
+}
+
+// Appeler le bind après le rendu initial, et à chaque fois que l’UI est reconstruite
+window.addEventListener('DOMContentLoaded', function(){
+  bindClientRefresh();
+});
+
 
 
 // Calcule les totaux par joueur pour un pooler, sur un intervalle
