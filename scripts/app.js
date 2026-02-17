@@ -449,115 +449,7 @@ function countMatches(playerName, fromStr, toStr){
   return mj;
 }
 
-// === CONFIG "hardcodée" ===
-var NHL_BRACKET_PAGE = 'https://www.nhl.com/events/olympic-winter-games-milano-cortina-2026/';
-var NHL_BRACKET_ELEMENT_ID = 'fl-layout-wrapper-outer';
 
-// OPTION RECOMMANDÉE: déploie l’Apps Script ci-dessous et mets son URL ici
-var BRACKET_PROXY = 'https://script.google.com/macros/s/AKfycby1Ff8uLcaUwZdNusnNvaR-YjzjGKVd-BytJXCTakSmXWYoc8JLjK5CqiwBwL7ipTjX/exec'; // ex: 'https://script.google.com/macros/s/XXXXXX/exec'
-
-// --- DOM utils ---
-function $(id){ return document.getElementById(id); }
-
-// Sanitisation basique: enlève <script>, <iframe> et attributs on* (onclick, …)
-function sanitizeFragment(root) {
-  try {
-    var scripts = root.querySelectorAll('script, iframe');
-    var i;
-    for (i=0;i<scripts.length;i++){ scripts[i].parentNode.removeChild(scripts[i]); }
-
-    var all = root.getElementsByTagName('*');
-    for (i=0;i<all.length;i++){
-      var atts = all[i].attributes; if (!atts) continue;
-      var j, remove = [];
-      for (j=0;j<atts.length;j++){
-        if (/^on/i.test(atts[j].name)) remove.push(atts[j].name);
-      }
-      for (j=0;j<remove.length;j++){ all[i].removeAttribute(remove[j]); }
-    }
-  } catch(e){}
-  return root;
-}
-
-// Chargement via proxy Apps Script
-function fetchNhlBracketViaProxy(url){
-  var prox = BRACKET_PROXY;
-  if (!prox) return Promise.reject(new Error('no-proxy'));
-  var final = prox + '?url=' + encodeURIComponent(url);
-  return fetch(final, { cache:'no-store' }).then(function(r){ return r.text(); });
-}
-
-function showNhlBracketIframeFallback(){
-  var wrap = document.getElementById('nhl-bracket-iframe-wrap');
-  var iframe = document.getElementById('nhl-bracket-iframe');
-  var host = document.getElementById('nhl-bracket-embed');
-  var empty = document.getElementById('nhl-bracket-empty');
-  if (!wrap || !iframe || !host || !empty) return;
-
-  // masque l’embed fragment
-  host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
-  host.innerHTML = '';
-
-  // affiche l’iframe + renseigne src
-  wrap.style.display = 'block';
-  iframe.src = NHL_BRACKET_PAGE;
-
-  // si l’iframe est bloqué (X-Frame), on affichera au moins le lien
-  iframe.onerror = function(){
-    wrap.style.display = 'none';
-    empty.style.display = '';
-  };
-
-  // masque le message "vide"
-  empty.style.display = 'none';
-}
-
-function renderNhlBracket() {
-  var host  = document.getElementById('nhl-bracket-embed');
-  var empty = document.getElementById('nhl-bracket-empty');
-  var open  = document.getElementById('nhl-bracket-open');
-  if (!host || !empty) return;
-
-  if (open) open.href = NHL_BRACKET_PAGE;
-
-  // squelette
-  host.className = (host.className||'') + ' loading';
-  empty.style.display = 'none';
-
-  // 1) ESSAI VIA PROXY (si fourni)
-  if (BRACKET_PROXY && BRACKET_PROXY.length) {
-    fetchNhlBracketViaProxy(NHL_BRACKET_PAGE)
-      .then(function(html){
-        try {
-          var parser = new DOMParser();
-          var doc = parser.parseFromString(html, 'text/html');
-          var frag = doc.getElementById(NHL_BRACKET_ELEMENT_ID);
-
-          if (!frag) {
-            // ⚠️ Élément absent -> fallback iframe
-            showNhlBracketIframeFallback();
-            return;
-          }
-
-          // Sanitize + inject
-          frag = sanitizeFragment(frag.cloneNode(true));
-          host.innerHTML = '';
-          host.appendChild(frag);
-          host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
-        } catch (e) {
-          // Parse/DOM échoue -> fallback iframe
-          showNhlBracketIframeFallback();
-        }
-      })
-      .catch(function(){
-        // Proxy KO -> fallback iframe
-        showNhlBracketIframeFallback();
-      });
-  } else {
-    // 2) AUCUN PROXY -> fallback iframe direct
-    showNhlBracketIframeFallback();
-  }
-}
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
  *  - Poolers : pooler,skaters,goalies
@@ -2371,17 +2263,52 @@ window.addEventListener('resize', renderLeaderboardCardsMobile, { passive: true 
 window.addEventListener('orientationchange', renderLeaderboardCardsMobile, { passive: true });
 placeLeaderboardFirstOnMobile();
 
+// URL Flourish fournie
+var FLOURISH_EMBED_URL = 'https://flo.uri.sh/visualisation/27134904/embed?auto=1';
+
+// Place la section bracket juste après le classement (quel que soit l’ordre initial)
 function placeBracketAfterLeaderboard(){
   var main = document.querySelector('main') || document.body;
-  var lb = document.getElementById('leaderboard-section');
-  var br = document.getElementById('bracket-section');
-  if (main && lb && br && lb.nextSibling !== br) {
-    main.insertBefore(br, lb.nextSibling);
+  var lb   = document.getElementById('leaderboard-section');
+  var br   = document.getElementById('bracket-section');
+  if (!main || !lb || !br) return;
+  if (lb.nextSibling !== br) main.insertBefore(br, lb.nextSibling);
+}
+
+// Crée l’iframe dynamiquement (évite que l’URL soit affichée comme texte)
+function renderFlourishBracket(){
+  var wrap = document.getElementById('bracket-embed-wrap');
+  var fb   = document.getElementById('bracket-embed-fallback');
+  if (!wrap) return;
+
+  // Nettoie tout précédent
+  wrap.innerHTML = '';
+
+  try {
+    var ifr = document.createElement('iframe');
+    ifr.setAttribute('title', 'Bracket Milano Cortina 2026');
+    ifr.setAttribute('loading', 'lazy');
+    ifr.setAttribute('scrolling', 'no');
+    ifr.setAttribute('frameborder', '0');
+    ifr.src = FLOURISH_EMBED_URL;
+
+    // Gestion d'erreur simple
+    ifr.onerror = function(){
+      if (fb) fb.style.display = '';
+    };
+
+    wrap.appendChild(ifr);
+  } catch (e) {
+    console.warn('Flourish embed error:', e);
+    if (fb) fb.style.display = '';
   }
 }
 
-window.addEventListener('DOMContentLoaded', placeBracketAfterLeaderboard);
-
+// Appels au chargement
+window.addEventListener('DOMContentLoaded', function(){
+  placeBracketAfterLeaderboard();
+  renderFlourishBracket();
+});
 
 document.addEventListener('visibilitychange', function(){
   if (document.visibilityState === 'visible') {
