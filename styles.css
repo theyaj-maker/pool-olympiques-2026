@@ -710,3 +710,22 @@ body.has-status-badge { padding-top: 56px; } /* espace pour le badge en mobile *
 @media (max-width: 768px) {
   #bracket-embed-wrap iframe { height: 900px; }  /* ajuste selon le rendu Flourish en mobile */
 }
+/* S'assurer que la toolbar client est au-dessus de l'iframe et cliquable */
+#client-toolbar {
+  position: sticky; /* ou fixed selon ta mise en page */
+  top: 60px;        /* adapte : sous le badge si tu en as un */
+  z-index: 20000;   /* au-dessus des iframes */
+  pointer-events: auto;
+}
+
+/* L’iframe bracket ne doit pas passer au-dessus de la toolbar */
+#bracket-embed-wrap iframe {
+  position: relative;
+  z-index: 1;
+}
+
+/* Le badge garde une réserve en haut et ne déborde pas sur le bouton */
+.status-badge{
+  z-index: 25000;
+}
+body.has-status-badge { padding-top: 56px; } /* déjà dans tes styles normalement */
