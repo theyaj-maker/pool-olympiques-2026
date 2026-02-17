@@ -487,57 +487,77 @@ function fetchNhlBracketViaProxy(url){
   return fetch(final, { cache:'no-store' }).then(function(r){ return r.text(); });
 }
 
-// Fallback: iframe de la page complète (si framing autorisé)
 function showNhlBracketIframeFallback(){
-  var wrap = $('nhl-bracket-iframe-wrap'), iframe = $('nhl-bracket-iframe');
-  if (!wrap || !iframe) return;
+  var wrap = document.getElementById('nhl-bracket-iframe-wrap');
+  var iframe = document.getElementById('nhl-bracket-iframe');
+  var host = document.getElementById('nhl-bracket-embed');
+  var empty = document.getElementById('nhl-bracket-empty');
+  if (!wrap || !iframe || !host || !empty) return;
+
+  // masque l’embed fragment
+  host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
+  host.innerHTML = '';
+
+  // affiche l’iframe + renseigne src
   wrap.style.display = 'block';
   iframe.src = NHL_BRACKET_PAGE;
-  var empty = $('nhl-bracket-empty');
-  if (empty){ empty.style.display = 'none'; }
+
+  // si l’iframe est bloqué (X-Frame), on affichera au moins le lien
+  iframe.onerror = function(){
+    wrap.style.display = 'none';
+    empty.style.display = '';
+  };
+
+  // masque le message "vide"
+  empty.style.display = 'none';
 }
 
-// Rendu principal
 function renderNhlBracket() {
-  var host = $('nhl-bracket-embed');
-  var empty = $('nhl-bracket-empty');
-  var open = $('nhl-bracket-open');
+  var host  = document.getElementById('nhl-bracket-embed');
+  var empty = document.getElementById('nhl-bracket-empty');
+  var open  = document.getElementById('nhl-bracket-open');
   if (!host || !empty) return;
 
-  if (open) { open.href = NHL_BRACKET_PAGE; }
+  if (open) open.href = NHL_BRACKET_PAGE;
 
   // squelette
   host.className = (host.className||'') + ' loading';
   empty.style.display = 'none';
 
-  // 1) Essayer via proxy (recommandé)
-  fetchNhlBracketViaProxy(NHL_BRACKET_PAGE)
-    .then(function(html){
-      // Parser le HTML renvoyé
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
-      var frag = doc.getElementById(NHL_BRACKET_ELEMENT_ID);
-      if (!frag) throw new Error('element-not-found');
+  // 1) ESSAI VIA PROXY (si fourni)
+  if (BRACKET_PROXY && BRACKET_PROXY.length) {
+    fetchNhlBracketViaProxy(NHL_BRACKET_PAGE)
+      .then(function(html){
+        try {
+          var parser = new DOMParser();
+          var doc = parser.parseFromString(html, 'text/html');
+          var frag = doc.getElementById(NHL_BRACKET_ELEMENT_ID);
 
-      // Sanitize + inject
-      frag = sanitizeFragment(frag.cloneNode(true));
-      host.innerHTML = '';
-      host.appendChild(frag);
-      host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
-    })
-    .catch(function(err){
-      // 2) Si pas de proxy (ou erreur), tenter l’iframe
-      host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
-      // Si pas de proxy configuré, on essaye l’iframe
-      if (String(err && err.message) === 'no-proxy') {
+          if (!frag) {
+            // ⚠️ Élément absent -> fallback iframe
+            showNhlBracketIframeFallback();
+            return;
+          }
+
+          // Sanitize + inject
+          frag = sanitizeFragment(frag.cloneNode(true));
+          host.innerHTML = '';
+          host.appendChild(frag);
+          host.className = (host.className||'').replace(/\bloading\b/g,'').trim();
+        } catch (e) {
+          // Parse/DOM échoue -> fallback iframe
+          showNhlBracketIframeFallback();
+        }
+      })
+      .catch(function(){
+        // Proxy KO -> fallback iframe
         showNhlBracketIframeFallback();
-        return;
-      }
-      // Si le site refuse l’iframe, afficher le lien
-      empty.style.display = '';
-    });
+      });
+  } else {
+    // 2) AUCUN PROXY -> fallback iframe direct
+    showNhlBracketIframeFallback();
+  }
 }
-
 /***** =========================================
  * SOURCES DISTANTES (CSV publiés - Google Sheets)
  *  - Poolers : pooler,skaters,goalies
